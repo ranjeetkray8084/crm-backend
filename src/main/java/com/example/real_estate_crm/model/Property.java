@@ -1,6 +1,5 @@
 package com.example.real_estate_crm.model;
 
-
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -18,29 +17,52 @@ public class Property {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long propertyId;
 
-    private String title;
+    // P-Name
+    private String propertyName;
+    
+ 
+    private Long createdBy;
+
+
+    // Commercial / Residential
     private String type;
-    private String location;
+
+    // 1BHK / 2BHK / 3BHK etc.
+    private String bhk;
+
+    // e.g., 250/415 etc.
     private String size;
 
-    private BigDecimal price;
+    // Owner name and contact number
+    private String ownerName;
+    private String ownerContact;
 
+    private String price;
+
+    // Available for Sale / Rent / Rent Out / Sold Out
     @Enumerated(EnumType.STRING)
     private Status status;
 
-    @ManyToOne
-    @JoinColumn(name = "assigned_to")
-    private User assignedTo;
+    // Sector / Area
+    private String sector;
+
+    // Source of lead: Social media / Cold call / Project call / Reference
+    private String source;
+
+    @Column(columnDefinition = "TEXT")
+    private String remark;
 
     private LocalDateTime createdAt;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
     }
 
     public enum Status {
-        AVAILABLE,
-        BOOKED,
-        SOLD
+        AVAILABLE_FOR_SALE,
+        AVAILABLE_FOR_RENT,
+        RENT_OUT,
+        SOLD_OUT
     }
 }

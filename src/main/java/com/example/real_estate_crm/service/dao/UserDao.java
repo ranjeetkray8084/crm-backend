@@ -8,7 +8,8 @@ import com.example.real_estate_crm.model.User;
 public interface UserDao {
     List<User> getAllUsers();
 
-    Optional<User> getUserById(Long id); // Use Optional for safety
+    Optional<User> getUserById(Long id);
+    Optional<User> findById(Long id);
 
     User save(User user);
 
@@ -16,8 +17,19 @@ public interface UserDao {
 
     void deleteById(Long id);
 
-    Optional<User> findByEmail(String email); // For login, password check goes in service
+    Optional<User> findByEmail(String email);
 
-    // Optionally: logout-related functionality only if you're tracking sessions
-    void logout(Long userId); // You can omit this if not managing sessions server-side
+    void logout(Long userId);
+    User authenticateUser(User user); // Authenticate user (Login)
+
+    
+    void sendResetPasswordEmail(String email); // Send OTP to email
+
+    boolean verifyOtp(String email, String otp); // Verify OTP for given email
+
+    void resetPasswordWithOtp(String email, String newPassword); // Reset password after OTP verification
+
+	Optional<String> findUsernameByUserId(Long userId);
+
+    
 }

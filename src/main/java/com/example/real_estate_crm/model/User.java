@@ -1,8 +1,8 @@
 package com.example.real_estate_crm.model;
 
-import jakarta.persistence.*;
-import lombok.*;
 
+import lombok.*;
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -20,11 +20,15 @@ public class User {
     private Long userId;
 
     private String name;
+    @Column(unique = true, nullable = false)
     private String email;
+
     private String password;
+    @Column(unique = true, nullable = false)
     private String phone;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 20)
     private Role role;
 
     private Boolean status;
@@ -36,29 +40,27 @@ public class User {
         this.createdAt = LocalDateTime.now();
     }
 
-    @OneToMany(mappedBy = "assignedTo", cascade = CascadeType.ALL)
-    @JsonManagedReference  // This ensures the User entity is serialized
+    // ✅ Prevent infinite recursion with leads
+    @OneToMany(mappedBy = "assignedTo", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference // Forward part of the reference
     private List<Lead> leads;
 
-    @OneToMany(mappedBy = "assignedTo", cascade = CascadeType.ALL)
-    private List<Property> properties;
-
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    // ✅ Optional: Add back-reference annotations in FollowUp and Note models if needed
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FollowUp> followUps;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-    private List<Note> notes;
-    
- // ✅ OTP for password reset
+
+
+    // ✅ OTP for password reset
     @Column(name = "otp_code")
     private String otpCode;
 
-    // ✅ OTP expiration time
     @Column(name = "otp_expiry")
     private LocalDateTime otpExpiry;
 
     public enum Role {
         ADMIN,
-        EMPLOYEE
+        USER,
+        DEVELOPER
     }
 }

@@ -1,44 +1,62 @@
 package com.example.real_estate_crm.service.impl;
-
-import java.util.List;
+//
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Service;
 
-import com.example.real_estate_crm.model.Lead;
 import com.example.real_estate_crm.model.Note;
 import com.example.real_estate_crm.repository.NoteRepository;
 import com.example.real_estate_crm.service.dao.NoteDao;
 
-@Repository
+import java.util.List;
+import java.util.Optional;
+
+@Service
 public class NoteDaoImpl implements NoteDao {
 
     @Autowired
     private NoteRepository noteRepository;
 
     @Override
-    public List<Note> getAllNotes() {
-        return noteRepository.findAll();
-    }
-
-    @Override
-    public Note findById(Long id) {
-        return noteRepository.findById(id).orElse(null);
-    }
-
-    @Override
-    public Note addNote(Note note) {
+    public Note saveNote(Note note) {
         return noteRepository.save(note);
     }
 
     @Override
-    public Note updateNote(Note note) {
-        // Optional: add check if lead exists first
-        return noteRepository.save(note); // JPA automatically updates if ID exists
+    public List<Note> findNotesByUserId(Long userId) {
+        return noteRepository.findByUserId(userId);
+    }
+
+    @Override
+    public List<Note> findNotesVisibleToUser(Long userId) {
+        return noteRepository.findByVisibleUserIdsContaining(userId);
+    }
+
+    @Override
+    public List<Note> findNotesByVisibility(Note.Visibility visibility) {
+        return noteRepository.findByVisibility(visibility);
+    }
+
+    public List<Note> getNotesForUser(Long userId) {
+        // Get notes visible to the user using a repository method that filters notes by visibility
+        return noteRepository.findNotesVisibleToUser(userId);
+    }
+
+    @Override
+    public List<Note> findNotesVisibleToUser1(Long userId) {
+        return noteRepository.findNotesVisibleToUser(userId);
+    }
+
+
+   
+    @Override
+    public Optional<Note> findNoteById(Long noteId) {
+        return Optional.ofNullable(noteRepository.findById(noteId).orElse(null)); // Adjust based on your repository
     }
     
     @Override
-    public void deleteById(Long id) {
-        noteRepository.deleteById(id);
+    public List<Note> findAllNotes() {
+        return noteRepository.findAll();
     }
+
 }
