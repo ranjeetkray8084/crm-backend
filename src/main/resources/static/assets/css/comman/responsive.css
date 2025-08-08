@@ -1,0 +1,286 @@
+/* Sidebar toggle button */
+.sidebar-toggle {
+  display: none;
+  font-size: 24px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: white;
+  margin-right: 20px;
+}
+
+/* Table responsiveness */
+.table-responsive {
+  height: 49vh;
+  width: 79vw;
+  overflow-x: auto;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  position: relative; /* Required for mobile filter panel positioning */
+}
+
+/* Modal */
+.modal2 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* iOS smooth scroll */
+@supports (-webkit-overflow-scrolling: touch) {
+  .table-responsive {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Scrollbar */
+.table-responsive::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.table-responsive::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+.table-responsive::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+.table-responsive::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+h3 {
+  color: black;
+}
+
+/* Table styles */
+.table-responsive table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+}
+.table-responsive table th,
+.table-responsive table td {
+  padding: 10px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid #ddd;
+}
+
+/* Notification style */
+.notification-item {
+  border: 2px solid black;
+  padding: 10px;
+  background-color: #e0f7fa;
+  color: black;
+  border-radius: 5px;
+  margin: 5px;
+}
+#notificationList {
+  max-height: 600px;
+  overflow-y: auto;
+}
+#updateLeadForm {
+  color: black;
+}
+
+/* ====================== Mobile Filter Panel ====================== */
+.mobile-filter-panel {
+  display: none;
+}
+
+/* Responsive Filter Panel for Mobile */
+@media (max-width: 768px) {
+  .mobile-filter-btn {
+    display: block;
+  }
+
+  .desktop-filters {
+    display: none !important;
+  }
+
+  .mobile-filter-panel {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 0;
+    left: -100%; /* Start hidden from left */
+    width: 80%;
+    height: 100%;
+    background: #f4f4f4;
+    z-index: 10;
+    padding: 20px;
+    transition: left 0.3s ease-in-out; /* Transition for left instead of right */
+    box-shadow: 5px 0 10px rgba(0, 0, 0, 0.2); /* Shadow on the right side */
+  }
+
+  .mobile-filter-panel.show {
+    left: 0; /* Show from left */
+  }
+
+  .mobile-filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+
+  .close-filter-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: red;
+  }
+
+  .mobile-filter-body select,
+  .mobile-filter-body button {
+    margin-bottom: 10px;
+    padding: 6px;
+    width: 100%;
+  }
+}
+
+
+/* ===================== Desktop Filters ===================== */
+@media (min-width: 769px) {
+  .desktop-filters {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+
+  .mobile-filter-btn {
+    display: none;
+  }
+}
+
+/* ===================== Other Responsive UI ===================== */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: -250px;
+    top: 0;
+    height: 100%;
+    width: 250px;
+    background: #1e1e2f;
+    transition: left 0.3s ease;
+    z-index: 1001;
+  }
+
+  .sidebar.active {
+    left: 0;
+  }
+
+  .sidebar-toggle {
+    display: block;
+  }
+
+  .table-responsive {
+    width: 95vw;
+    height: 45vh;
+  }
+
+  .main-content {
+    padding: 2px;
+    width: 100vw;
+  }
+
+  .welcome-message h1 {
+    font-size: 15px;
+  }
+
+  .welcome-message p {
+    display: none;
+  }
+
+  .search-container input,
+  .search-icon,
+  .icon {
+    display: none;
+  }
+
+  .stat {
+    flex-direction: column;
+    gap: 50px;
+    width: 50%;
+    margin: 50px;
+  }
+
+  .header-section {
+    padding: 10px;
+  }
+
+  .New {
+    padding: 10px 15px;
+    font-size: 15px;
+    margin-right: 10px;
+    border-radius: 13px;
+  }
+
+  .welcome-message h1 span,
+  .profile-info .name {
+    font-size: 9px;
+  }
+
+  .profile-section {
+    padding: 0px 15px;
+  }
+
+  .table-responsive::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .table-responsive::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 3px;
+  }
+
+  form {
+    margin: 0px 20px;
+  }
+
+  .addform {
+    padding: 10px;
+    margin: 10px;
+  }
+
+  button {
+    font-size: 13px;
+    padding: 5px 7px;
+  }
+
+  .modal-content {
+    margin-top: 150px;
+    width: 90%;
+    height: 65%;
+  }
+
+  input {
+    width: 160px;
+  }
+
+  #dashboard-stats {
+    padding: 0 10px;
+  }
+
+  .modal2{
+    height: 91vh;
+  }
+
+  .modal-content1{
+    width: 90%;
+  }
+}

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- SEO Meta Tags -->
+  <title>Lead Tracker | Real Estate CRM Dashboard</title>
+  <meta name="description"
+    content="Efficiently manage leads, follow-ups, and properties with our Real Estate CRM Lead Tracker dashboard." />
+  <meta name="keywords"
+    content="Real Estate CRM, Lead Management, Property Tracker, Sales CRM, Follow-ups, CRM Dashboard" />
+  <meta name="author" content="Lead Tracker" />
+
+  <!-- Open Graph (for social media sharing) -->
+  <meta property="og:title" content="Lead Tracker | Real Estate CRM Dashboard" />
+  <meta property="og:description"
+    content="Manage your real estate business efficiently with our powerful Lead Tracker dashboard." />
+  <meta property="og:image" content="https://leadtracker.in/assets/images/og-image.jpg" />
+  <meta property="og:url" content="https://leadtracker.in/admin/dashboard" />
+  <meta property="og:type" content="website" />
+
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://leadstracker.in" />
+
+  <!-- Favicon -->
+  <link rel="icon" href="../assets/images/favicon.ico" type="image/x-icon" />
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="../assets/css/comman/comman.css">
+  <link rel="stylesheet" href="../assets/css/admin/admin.css">
+  <link rel="stylesheet" href="../assets/css/comman/loading.css">
+  <link rel="stylesheet" href="../assets/css/comman/footer.css">
+  <link rel="stylesheet" href="../assets/css/comman/responsive.css">
+
+  <!-- Tagify CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css">
+
+  <!-- Tagify JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
+
+
+
+</head>
+
+<body>
+  <div class="container">
+    <!-- Sidebar -->
+
+
+    <aside class="sidebar" id="sidebar">
+      <div style="display: flex;">
+        <img src="../assets/img/logo.jpeg" alt="Logo"
+          style="margin: 10px 10px 10px 10px; height: 40px; vertical-align: middle; margin-right: 8px; border-radius: 20px;">
+        <h2 class="logo">
+          LeadsTracker
+          <br>
+          <span style="font-size: 13px;">(By Smartprocare)</span>
+        </h2>
+      </div>
+
+      <ul class="nav-links">
+        <button id="dashboardBtn" onclick="showSection('ViewDashboard', this)">
+          <i class="icon">📊</i> Dashboard
+        </button>
+        <button onclick="showSection('ViewUsers', this)"><i class="icon">👤</i> Users</button>
+        <button onclick="showSection('ViewLead', this)"><i class="icon">📋</i> Leads</button>
+        <button onclick="showSection('ViewProperty', this)"><i class="icon">🏢</i> Property</button>
+        <button onclick="showSection('ViewNotes', this)"><i class="icon">🗒️</i>Notes/Event</button>
+        <button onclick="showSection('ViewTask', this)">📞 Calling Data</button>
+        <button id="notificationButton" onclick="showSection('ViewNotification', this)">
+          <i class="icon">🔔</i> Notifications
+          <span id="notificationCount" class="notification-count" style="display: none;">0</span>
+        </button>
+        <button onclick="showSection('ViewAccount', this)"><i class="icon">👤</i> Account</button>
+        <button onclick="showSection('logout', this)"><i class="icon">🚪</i> Log Out</button>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Header -->
+      <header class="header-section">
+        <!-- Toggle Button -->
+        <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+
+        <div class="welcome-message">
+          <h1>Welcome <span id="companyName">Company Name</span></h1>
+          <p>Let's take a detailed look at our workplace...</p>
+        </div>
+
+        <div class="search-container">
+          <input type="text" placeholder="Search here">
+          <span class="search-icon">🔍</span>
+        </div>
+
+        <i class="icon">🔔</i>
+
+        <!-- Add Dropdown -->
+        <div class="dropdown">
+          <button class="New">➕ Add</button>
+          <div class="dropdown-content">
+            <a href="#" onclick="showSection('User')">User</a>
+            <a href="#" onclick="showSection('Lead')">Lead</a>
+            <a href="#" onclick="showSection('Properties')">Properties</a>
+            <a href="#" onclick="showSection('Notes')">Notes/Event</a>
+            <a href="#" onclick="showSection('Task')">Calling Data</a>
+          </div>
+        </div>
+
+        <!-- Profile Section -->
+        <div class="profile-section">
+          <div class="profile-info">
+            <span class="name" id="userName">Chandra Vikas</span>
+            <span class="role" id="userRole">User</span>
+          </div>
+          <img id="avatarPreview" src="assets/default-avatar.png" alt="Avatar Preview">
+        </div>
+      </header>
+
+      <!-- Dashboard Stats Section -->
+      <div id="dashboard-stats">
+        <!-- Injected by JS -->
+      </div>
+      <!-- Custom customAlert -->
+      <div id="custom-customAlert" class="custom-customAlert hidden">
+        <div class="custom-customAlert-box">
+          <p id="custom-customAlert-message"></p>
+          <button onclick="closeCustomcustomAlert()">OK</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+
+
+  <!-- Option Popup Modal -->
+  <div id="customOptionPopup" class="modal hidden">
+    <h3 id="optionPopupUserName"></h3>
+    <button onclick="selectOption('lead')">Show Leads</button>
+    <button onclick="selectOption('property')">Show Properties</button>
+    <button onclick="closeOptionPopup()" style="margin-top:10px; background:red; color:white;">Cancel</button>
+  </div>
+
+  <!-- Overlay -->
+  <div id="optionPopupOverlay" class="overlay hidden"></div>
+
+  <!-- Lead Summary Modal -->
+  <div id="leadSummaryModal" class="modal hidden">
+    <h3>Lead Summary</h3>
+    <div id="leadSummaryContent"></div>
+    <button onclick="closeLeadSummary()">Close</button>
+  </div>
+
+
+
+  <!-- Modal Container -->
+  <!-- Lead Remark Modal -->
+  <div id="leadRemarkModal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn" onclick="closeLeadRemarkModal()">&times;</span>
+      <h3>Lead Remarks</h3>
+      <div id="leadModalBody"></div>
+      <div id="leadRemarkInputContainer" style="margin-top: 10px;">
+        <textarea id="leadRemarkInput" placeholder="Write your remark here..." rows="4" style="width: 100%;"></textarea>
+        <button onclick="submitLeadRemark()" style="margin-top: 10px;">Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Property Remark Modal -->
+  <div id="propertyRemarkModal" class="modal">
+    <div class="modal-content">
+      <span class="close-btn" onclick="closePropertyRemarkModal()">&times;</span>
+      <h3>Property Remarks</h3>
+      <div id="propertyModalBody"></div>
+      <div id="propertyRemarkInputContainer" style="margin-top: 10px;">
+        <textarea id="propertyRemarkInput" placeholder="Write your remark here..." rows="4"
+          style="width: 100%;"></textarea>
+        <button onclick="submitPropertyRemark()" style="margin-top: 10px;">Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="noteRemarkModal" class="modal">
+    <div class="modal-content" style="color: black;">
+      <span class="close-btn" onclick="closeNoteRemarkModal()">&times;</span>
+      <h3>Note Remarks</h3>
+      <div id="noteModalBody"></div>
+      <div id="noteRemarkInputContainer" style="margin-top: 10px;">
+        <textarea id="noteRemarkInput" placeholder="Write your remark here..." rows="4" style="width: 100%;"></textarea>
+        <button onclick="submitNoteRemark()" style="margin-top: 10px;">Submit</button>
+      </div>
+    </div>
+  </div>
+
+
+
+  <footer id="footer">
+
+  </footer>
+
+
+
+  <!-- Scripts -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const currentPage = window.location.pathname;
+
+      // Auto load dashboard if logged in
+      if (user && user.userId) {
+        const dashboardBtn = document.getElementById("dashboardBtn");
+
+        // ✅ Remove 'active' from all buttons in sidebar (with class .nav-links)
+        const sidebarButtons = document.querySelectorAll(".nav-links button");
+        sidebarButtons.forEach(btn => btn.classList.remove("active"));
+
+        // ✅ Add 'active' only to Dashboard button
+        if (dashboardBtn) {
+          dashboardBtn.classList.add("active");
+        }
+
+        // ✅ Load dashboard section
+        showSection("ViewDashboard", dashboardBtn);
+
+      } else {
+        // Not logged in → redirect to login
+        if (!currentPage.includes("login")) {
+          window.location.href = "../login.html";
+        }
+      }
+    });
+
+
+
+    setInterval(async () => {
+    try {
+      const res = await fetch("/api/users/check-session", {
+        credentials: "include"
+      });
+
+      if (!res.ok) {
+        const result = await res.json();
+        alert(result.message || "⚠️ Session expired. Please login again.");
+        window.location.href = "/";
+      }
+    } catch (err) {
+      customAlert("⚠️ Session expired. Please login again.");
+      window.location.href = "/";
+    }
+  }, 5000);
+
+
+    function toggleSidebar() {
+      const sidebar = document.querySelector(".sidebar");
+      sidebar.classList.toggle("active");
+    }
+    function customAlert(message) {
+      const customAlertBox = document.getElementById("custom-customAlert");
+      const customAlertMessage = document.getElementById("custom-customAlert-message");
+      customAlertMessage.textContent = message;
+      customAlertBox.classList.remove("hidden");
+    }
+
+
+    function closeCustomcustomAlert() {
+      document.getElementById("custom-customAlert").classList.add("hidden");
+    }
+
+    // Set user info dynamically
+    const user = JSON.parse(localStorage.getItem("user"));
+    const companyId = parseInt(localStorage.getItem("companyId"), 10);
+
+    // ✅ Set user name and role
+    if (user) {
+      document.getElementById("userName").textContent =
+        user.name || user.email?.split('@')[0] || "User";
+      document.getElementById("userRole").textContent = user.role || "User";
+    }
+
+    // ✅ Fetch and display company name from API
+    if (companyId) {
+      fetch(`/api/companies/name/${companyId}`, {
+        credentials: "include"
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("Company not found");
+          }
+          return response.text(); // Since your API returns just a string (name)
+        })
+        .then(companyName => {
+          document.getElementById("companyName").textContent = companyName;
+        })
+        .catch(error => {
+          console.error("Error fetching company name:", error);
+          document.getElementById("companyName").textContent = "Unknown Company";
+        });
+    } else {
+      document.getElementById("companyName").textContent = "No Company ID";
+    }
+
+
+
+
+
+
+  </script>
+
+  <script src="../assets/js/comman/dashboard.js"></script>
+  <script src="../assets/js/admin/admin.js"></script>
+  <script src="../assets/js/admin/note.js"></script>
+  <script src="../assets/js/admin/users.js"></script>
+  <script src="../assets/js/comman/revokandunrevok.js"></script>
+  <script src="../assets/js/user/notification.js"></script>
+  <script src="../assets/js/admin/lead.js"></script>
+  <script src="../assets/js/comman/responsive.js"></script>
+  <script src="../assets/js/comman/footer.js"></script>
+  <script src="../assets/js/admin/property.js"></script>
+  <script src="../assets/js/admin/task.js"></script>
+
+</body>
+
+</html>
