@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Excel Viewer</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 8px; }
+    th { background-color: #f5f5f5; }
+  </style>
+</head>
+<body>
+  <h2>📄 Task Excel Preview</h2>
+  <table id="excelTable">
+    <thead id="excelPreviewThead"></thead>
+    <tbody id="excelPreviewTbody"></tbody>
+  </table>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const taskId = urlParams.get("taskId");
+    const companyId = urlParams.get("companyId");
+
+    async function loadExcelData() {
+      const res = await fetch(`/api/task-files/${taskId}/preview?companyId=${companyId}`);
+      const data = await res.json();
+
+      const thead = document.getElementById("excelPreviewThead");
+      const tbody = document.getElementById("excelPreviewTbody");
+
+      thead.innerHTML = "";
+      tbody.innerHTML = "";
+
+      if (data.length === 0) {
+        thead.innerHTML = "<tr><th>No Data</th></tr>";
+        return;
+      }
+
+      // Header
+      let headerHtml = "<tr>";
+      data[0].forEach(cell => {
+        headerHtml += `<th>${cell}</th>`;
+      });
+      headerHtml += "</tr>";
+      thead.innerHTML = headerHtml;
+
+      // Body
+      for (let i = 1; i < data.length; i++) {
+        let rowHtml = "<tr>";
+        data[i].forEach(cell => {
+          rowHtml += `<td>${cell}</td>`;
+        });
+        rowHtml += "</tr>";
+        tbody.innerHTML += rowHtml;
+      }
+    }
+
+    loadExcelData();
+  </script>
+</body>
+</html>

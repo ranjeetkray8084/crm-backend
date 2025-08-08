@@ -1,0 +1,46 @@
+/* Wrapper for centering */
+#dashboard-stats {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 90vh; /* Adjust as needed */
+  }
+  
+  /* Optional: style the form for spacing */
+  #addUserForm {
+    width: 100%;
+    max-width: 600px;
+    padding: 30px;
+    background-color: #f4f4f4; /* light background */
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Inputs and labels spacing */
+  #addUserForm label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: bold;
+  }
+  
+  #addUserForm input,
+  #addUserForm select {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border: none;
+    border-radius: 5px;
+    background-color: #333;
+    color: white;
+  }
+  
+  /* Button style */
+  #addUserForm button {
+    padding: 10px 20px;
+    background-color: #007bff;
+    border: none;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  

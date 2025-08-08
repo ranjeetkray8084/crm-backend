@@ -1,152 +1,376 @@
 package com.example.real_estate_crm.Controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
-
-import com.example.real_estate_crm.model.User;
-import com.example.real_estate_crm.model.User.Role;
-import com.example.real_estate_crm.model.Note;
-import com.example.real_estate_crm.repository.NoteRepository;
-import com.example.real_estate_crm.repository.UserRepository;
+import com.example.real_estate_crm.model.*;
+import com.example.real_estate_crm.model.Note.Priority;
+import com.example.real_estate_crm.model.Note.Status;
+import com.example.real_estate_crm.model.Note.Visibility;
+import com.example.real_estate_crm.repository.*;
 import com.example.real_estate_crm.service.NotificationService;
 import com.example.real_estate_crm.service.dao.NoteDao;
-import com.example.real_estate_crm.service.impl.UserDaoImpl;
+import com.example.real_estate_crm.service.dao.UserDao;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @RestController
-@RequestMapping("/api/notes")
+@RequestMapping("/api/companies/{companyId}/notes")
 public class NoteController {
 
-    @Autowired
-    private NoteDao noteDao;
+    private final NoteDao noteDao;
+    private final UserDao userService;
+    private final UserRepository userRepository;
+    private final CompanyRepository companyRepository;
+    private final NotificationService notificationService;
+    private final NoteRepository noteRepository;
+    private final NoteRemarkRepository noteRemarkRepository;
 
     @Autowired
-    private NotificationService notificationService;
+    public NoteController(
+            NoteDao noteDao,
+            UserDao userService,
+            UserRepository userRepository,
+            CompanyRepository companyRepository,
+            NotificationService notificationService,
+            NoteRepository noteRepository,
+            NoteRemarkRepository noteRemarkRepository
+    ) {
+        this.noteDao = noteDao;
+        this.userService = userService;
+        this.userRepository = userRepository;
+        this.companyRepository = companyRepository;
+        this.notificationService = notificationService;
+        this.noteRepository = noteRepository;
+        this.noteRemarkRepository = noteRemarkRepository;
+    }
 
-    @Autowired
-    private UserDaoImpl userService;
-
-    @Autowired
-    UserRepository userRepository;
-    
-    @Autowired
-    NoteRepository noteRepository;
-
-    // API to save a new note
+    // CREATE NOTE
     @PostMapping
-    public Note saveNote(@RequestBody Note note) {
-        // Save the note first
+    public ResponseEntity<Note> addNote(@PathVariable Long companyId, @RequestBody Note note) {
+        Optional<Company> companyOpt = companyRepository.findById(companyId);
+        if (companyOpt.isEmpty()) return ResponseEntity.badRequest().build();
+
+        note.setCompany(companyOpt.get());
         Note savedNote = noteDao.saveNote(note);
 
-        // Safely fetch the username of the note creator
-        Optional<String> usernameOpt = userService.findUsernameByUserId(note.getUserId());
+        String username = userService.findUsernameByUserId(note.getUserId()).orElse("Unknown User");
 
-        // Handle case when username is not found
-        String username = usernameOpt.orElse("Unknown User");
-
-        // Handle notifications based on visibility
         switch (note.getVisibility()) {
-
-            case ME_AND_ADMIN:
-                List<User> admins = userRepository.findByRole(Role.ADMIN); // Fetch all admin users
-                for (User admin : admins) {
-                    notificationService.sendNotification(admin.getUserId(), username + " created a new note for admin.");
-                }
-                break;
-
-            case ALL_USERS:
-                // Notify all users with 'USER' role
-                List<User> usersWithRoleUser = userRepository.findByRole(Role.USER);  // Fetch users with 'USER' role
-                for (User user : usersWithRoleUser) {
-                    notificationService.sendNotification(user.getUserId(), username + " shared a public note.");
-                }
-                break;
-
-            case SPECIFIC_USERS:
-                // Notify only specific users listed in 'note.getVisibleUserIds()'
-                if (note.getVisibleUserIds() != null && !note.getVisibleUserIds().isEmpty()) {
-                    // Iterate through the visible user IDs
+            case ME_AND_ADMIN -> userRepository.findByRole(User.Role.ADMIN)
+                    .forEach(admin -> notificationService.sendNotification(
+                            admin.getUserId(), companyOpt.get(), username + " created a new note for you."));
+            case ALL_USERS -> userRepository.findByRole(User.Role.USER)
+                    .forEach(user -> notificationService.sendNotification(
+                            user.getUserId(), companyOpt.get(), username + " shared a new note for you."));
+            case SPECIFIC_USERS -> {
+                if (note.getVisibleUserIds() != null) {
                     for (Long userId : note.getVisibleUserIds()) {
-                        // Fetch the user by ID to check their role (optional)
-                        Optional<User> userOpt = userRepository.findById(userId);
-
-                        if (userOpt.isPresent()) {
-                            User user = userOpt.get();
-
-                            // You can add extra filtering logic here if needed
-                            // For example, notify only users with the ADMIN role
-                            if (user.getRole() == Role.ADMIN || user.getRole() == Role.USER) {
-                                notificationService.sendNotification(user.getUserId(), username + " shared a private note with you.");
+                        userRepository.findById(userId).ifPresent(user -> {
+                            if (user.getRole() == User.Role.ADMIN || user.getRole() == User.Role.USER || user.getRole() == User.Role.DIRECTOR) {
+                                notificationService.sendNotification(
+                                        user.getUserId(), companyOpt.get(), username + " shared a new note with you.");
                             }
-                        }
+                        });
                     }
                 }
-                break;
-
-            default:
-                // No notification for ONLY_ME
-                break;
+            }
+            case ME_AND_DIRECTOR -> userRepository.findByRole(User.Role.DIRECTOR)
+                    .forEach(director -> notificationService.sendNotification(
+                            director.getUserId(), companyOpt.get(), username + " shared a new note with director."));
+            case ALL_ADMIN -> userRepository.findByRole(User.Role.ADMIN)
+                    .forEach(admin -> notificationService.sendNotification(
+                            admin.getUserId(), companyOpt.get(), username + " shared a note for all admins."));
+            case SPECIFIC_ADMIN -> {
+                if (note.getVisibleUserIds() != null) {
+                    for (Long userId : note.getVisibleUserIds()) {
+                        userRepository.findById(userId).ifPresent(user -> {
+                            if (user.getRole() == User.Role.ADMIN) {
+                                notificationService.sendNotification(
+                                        user.getUserId(), companyOpt.get(), username + " shared a note with specific admin.");
+                            }
+                        });
+                    }
+                }
+            }
         }
-
-        return savedNote;
+        return ResponseEntity.ok(savedNote);
     }
 
-    // API to get all notes by user (optional)
-    @GetMapping("/user/{userId}")
-    public List<Note> getNotesByUser(@PathVariable Long userId) {
-        return noteDao.findNotesByUserId(userId);
-    }
-
-    // New API to get the users who can see a specific note based on its visibility
-    @GetMapping("/{noteId}/visibility")
-    public List<Long> getNoteVisibility(@PathVariable Long noteId) {
-        Note note = noteDao.findNotesByUserId(noteId).stream()
-                .filter(n -> n.getId().equals(noteId))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Note not found"));
-
-        switch (note.getVisibility()) {
-            case ONLY_ME:
-                return List.of(note.getUserId());  // Only the creator can see the note
-            case ME_AND_ADMIN:
-                return List.of(note.getUserId(), 1L);  // User and Admin (Assuming Admin has ID 1)
-            case ALL_USERS:
-                return getAllUserIds();  // All users can see the note
-            case SPECIFIC_USERS:
-                return note.getVisibleUserIds();  // Only specific users can see the note
-            default:
-                throw new RuntimeException("Unknown visibility type");
-        }
-    }
-
-    
-    @GetMapping("/public-and-admin")
-    public List<Note> getAllPublicAndAdminNotes() {
-        // Getting notes where visibility is either ALL_USERS or ME_AND_ADMIN
-        return noteRepository.findByVisibilityIn(
-                List.of(Note.Visibility.ALL_USERS, Note.Visibility.ME_AND_ADMIN)
-        );
-    }
-    
-    
-    @GetMapping("/public")
-    public List<Note> getAllPublicNotes() {
-        List<Note> allNotes = noteRepository.findAll();
-        return allNotes.stream()
-                .filter(note -> note.getVisibility() == Note.Visibility.ALL_USERS)
-                .collect(Collectors.toList());
-    }
-    // Fake method to simulate fetching all users
-    private List<Long> getAllUserIds() {
-        // TODO: Replace with real user fetching (e.g., from UserService)
-        return List.of(2L, 3L, 4L, 5L); // example users
-    }
-
+    // ✅ ONLY THIS METHOD RETAINED
     @GetMapping("/visible-to/{userId}")
-    public List<Note> getNotesVisibleToUser(@PathVariable Long userId) {
-        return noteDao.findNotesVisibleToUser(userId);
+    public ResponseEntity<List<Note>> getNotesVisibleToUser(
+            @PathVariable Long companyId,
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "false") boolean isAdmin,
+            @RequestParam(defaultValue = "false") boolean isDirector) {
+        return ResponseEntity.ok(noteDao.findNotesVisibleToUserAndCompany(userId, companyId, isAdmin, isDirector));
+    }
+
+    
+    
+    @GetMapping("/{noteId}")
+    public ResponseEntity<Note> getNoteById(@PathVariable Long companyId, @PathVariable Long noteId) {
+        return noteDao.findNoteByIdAndCompany(noteId, companyId)
+                .map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<Note>> getNotesByUser(@PathVariable Long companyId, @PathVariable Long userId) {
+        return ResponseEntity.ok(noteDao.findNotesByUserIdAndCompanyId(userId, companyId));
+    }
+
+    @GetMapping("/public")
+    public ResponseEntity<List<Note>> getAllPublicNotes(@PathVariable Long companyId) {
+        return ResponseEntity.ok(noteRepository.findAll().stream()
+                .filter(note -> note.getVisibility() == Visibility.ALL_USERS
+                             && note.getCompany() != null
+                             && note.getCompany().getId().equals(companyId))
+                .collect(Collectors.toList()));
+    }
+
+    @GetMapping("/public-and-admin")
+    public ResponseEntity<List<Note>> getAllPublicAndAdminNotes(
+            @PathVariable Long companyId,
+            @RequestParam Long adminId
+    ) {
+        // 1. Get assigned users under this admin
+        List<User> assignedUsers = userRepository.findByCompanyIdAndAdmin_UserId(companyId, adminId);
+        List<Long> userIds = assignedUsers.stream().map(User::getUserId).toList();
+
+        // 2. Fetch notes created by assigned users with public/admin visibility
+        List<Visibility> visibilities = List.of(Visibility.ALL_USERS, Visibility.ME_AND_ADMIN);
+        List<Note> notes = noteRepository.findAllByCompany_IdAndVisibilityInAndUserIdIn(
+                companyId, visibilities, userIds
+        );
+
+        // 3. Add ALL_ADMIN notes (from any user)
+        List<Note> allAdminNotes = noteRepository.findAllByCompany_IdAndVisibility(
+                companyId, Visibility.ALL_ADMIN
+        );
+
+        // 4. Add SPECIFIC_ADMIN notes visible to this admin
+        List<Note> specificAdminNotes = noteRepository
+                .findAllByCompany_IdAndVisibilityAndVisibleUserIdsContaining(
+                        companyId, Visibility.SPECIFIC_ADMIN, adminId
+                );
+
+        // 5. Combine and avoid duplicates
+        Set<Long> existingNoteIds = notes.stream()
+                .map(Note::getId)
+                .collect(Collectors.toSet());
+
+        Stream.of(allAdminNotes, specificAdminNotes)
+                .flatMap(Collection::stream)
+                .filter(note -> !existingNoteIds.contains(note.getId()))
+                .forEach(notes::add);
+
+        return ResponseEntity.ok(notes);
+    }
+
+
+
+
+
+ // Correct logic for director
+    @GetMapping("/director-visible/{directorId}")
+    public ResponseEntity<List<Note>> getNotesVisibleToDirector(
+            @PathVariable Long companyId,
+            @PathVariable Long directorId) {
+
+        List<Note> notes = noteRepository.findNotesVisibleToDirector(companyId, directorId, true);
+        return ResponseEntity.ok(notes);
+    }
+
+
+    @PutMapping("/{noteId}")
+    public ResponseEntity<Note> updateNote(
+            @PathVariable Long companyId, @PathVariable Long noteId, @RequestBody Note noteDetails) {
+        Optional<Note> noteOpt = noteDao.findNoteByIdAndCompany(noteId, companyId);
+        if (noteOpt.isEmpty()) return ResponseEntity.notFound().build();
+
+        Note existingNote = noteOpt.get();
+        if (noteDetails.getContent() != null) existingNote.setContent(noteDetails.getContent());
+        if (noteDetails.getVisibility() != null) existingNote.setVisibility(noteDetails.getVisibility());
+        if (noteDetails.getVisibleUserIds() != null) existingNote.setVisibleUserIds(noteDetails.getVisibleUserIds());
+        if (noteDetails.getDateTime() != null) existingNote.setDateTime(noteDetails.getDateTime());
+        if (noteDetails.getPriority() != null) existingNote.setPriority(noteDetails.getPriority());
+        if (noteDetails.getStatus() != null) existingNote.setStatus(noteDetails.getStatus());
+
+        return ResponseEntity.ok(noteDao.updateNote(existingNote));
+    }
+
+    @DeleteMapping("/{noteId}")
+    public ResponseEntity<Void> deleteNote(@PathVariable Long companyId, @PathVariable Long noteId) {
+        if (noteDao.findNoteByIdAndCompany(noteId, companyId).isEmpty()) return ResponseEntity.notFound().build();
+        noteRemarkRepository.deleteByNoteIdAndCompanyId(noteId, companyId);
+        noteDao.deleteNoteByIdAndCompany(noteId, companyId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{noteId}/status")
+    public ResponseEntity<Note> updateNoteStatus(
+            @PathVariable Long companyId, @PathVariable Long noteId, @RequestParam("status") Status status) {
+        Optional<Note> optionalNote = noteDao.findNoteByIdAndCompany(noteId, companyId);
+        if (optionalNote.isEmpty()) return ResponseEntity.notFound().build();
+        Note note = optionalNote.get();
+        note.setStatus(status);
+        return ResponseEntity.ok(noteDao.updateNote(note));
+    }
+
+    @GetMapping("/status/{status}")
+    public ResponseEntity<List<Note>> getNotesByCompanyAndStatus(
+            @PathVariable Long companyId, @PathVariable("status") Status status) {
+        return ResponseEntity.ok(noteDao.findNotesByCompanyIdAndStatus(companyId, status));
+    }
+
+    @GetMapping("/user/{userId}/status/{status}")
+    public ResponseEntity<List<Note>> getNotesByUserAndStatus(
+            @PathVariable Long companyId, @PathVariable Long userId, @PathVariable("status") Status status) {
+        return ResponseEntity.ok(noteDao.findNotesByUserIdAndCompanyIdAndStatus(userId, companyId, status));
+    }
+
+    @GetMapping("/status-only/{status}")
+    public ResponseEntity<List<Note>> getNotesByStatusOnly(@PathVariable("status") Status status) {
+        return ResponseEntity.ok(noteDao.findNotesByStatus(status));
+    }
+
+    @GetMapping("/priority/{priority}")
+    public ResponseEntity<List<Note>> getNotesByCompanyAndPriority(
+            @PathVariable Long companyId, @PathVariable("priority") Priority priority) {
+        return ResponseEntity.ok(noteDao.findNotesByCompanyIdAndPriority(companyId, priority));
+    }
+
+    @GetMapping("/user/{userId}/priority/{priority}")
+    public ResponseEntity<List<Note>> getNotesByUserAndPriority(
+            @PathVariable Long companyId, @PathVariable Long userId,
+            @PathVariable("priority") Priority priority) {
+        return ResponseEntity.ok(noteDao.findNotesByUserIdAndCompanyIdAndPriority(userId, companyId, priority));
+    }
+
+    @GetMapping("/priority/{priority}/status/{status}")
+    public ResponseEntity<List<Note>> getNotesByPriorityAndStatus(
+            @PathVariable Long companyId,
+            @PathVariable("priority") Priority priority,
+            @PathVariable("status") Status status) {
+        return ResponseEntity.ok(noteDao.findNotesByCompanyIdAndPriorityAndStatus(companyId, priority, status));
+    }
+
+    @GetMapping("/user/{userId}/priority/{priority}/status/{status}")
+    public ResponseEntity<List<Note>> getNotesByUserAndPriorityAndStatus(
+            @PathVariable Long companyId, @PathVariable Long userId,
+            @PathVariable("priority") Priority priority, @PathVariable("status") Status status) {
+        return ResponseEntity.ok(noteDao.findNotesByUserIdAndCompanyIdAndPriorityAndStatus(userId, companyId, priority, status));
+    }
+
+    @GetMapping("/priority/sort/asc")
+    public ResponseEntity<List<Note>> getNotesSortedByPriorityAsc(@PathVariable Long companyId) {
+        return ResponseEntity.ok(noteDao.findNotesSortedByPriorityAsc(companyId));
+    }
+
+    @GetMapping("/priority/sort/desc")
+    public ResponseEntity<List<Note>> getNotesSortedByPriorityDesc(@PathVariable Long companyId) {
+        return ResponseEntity.ok(noteDao.findNotesSortedByPriorityDesc(companyId));
+    }
+
+    @PatchMapping("/{noteId}/priority")
+    public ResponseEntity<Note> updateNotePriority(
+            @PathVariable Long companyId,
+            @PathVariable Long noteId,
+            @RequestParam("priority") Priority priority) {
+
+        Optional<Note> optionalNote = noteDao.findNoteByIdAndCompany(noteId, companyId);
+        if (optionalNote.isEmpty()) return ResponseEntity.notFound().build();
+
+        Note note = optionalNote.get();
+        note.setPriority(priority);
+        return ResponseEntity.ok(noteDao.updateNote(note));
+    }
+
+    @PostMapping("/{noteId}/remarks")
+    public ResponseEntity<?> addRemarkToNote(
+            @PathVariable Long noteId, @RequestBody Map<String, String> requestBody) {
+
+        Optional<Note> optionalNote = noteRepository.findById(noteId);
+        if (optionalNote.isEmpty()) return ResponseEntity.notFound().build();
+
+        String userIdStr = requestBody.get("userId");
+        String remarkText = requestBody.get("remark");
+        if (remarkText == null || remarkText.trim().isEmpty()) return ResponseEntity.badRequest().body("Remark cannot be empty");
+        if (userIdStr == null) return ResponseEntity.badRequest().body("User ID is required");
+
+        Long userId;
+        try {
+            userId = Long.parseLong(userIdStr);
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest().body("Invalid User ID");
+        }
+
+        Optional<User> optionalUser = userRepository.findById(userId);
+        if (optionalUser.isEmpty()) return ResponseEntity.badRequest().body("User not found");
+
+        NoteRemark remark = new NoteRemark();
+        remark.setRemark(remarkText);
+        remark.setNote(optionalNote.get());
+        remark.setCreatedBy(optionalUser.get());
+
+        noteRemarkRepository.save(remark);
+        return ResponseEntity.ok("Remark added successfully");
+    }
+
+    @GetMapping("/{noteId}/remarks")
+    public ResponseEntity<?> getRemarksByNoteId(@PathVariable Long noteId) {
+        if (!noteRepository.existsById(noteId)) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(noteRemarkRepository.findByNote_Id(noteId));
+    }
+
+    @GetMapping("/{noteId}/visible-users")
+    public ResponseEntity<List<Long>> getVisibleUserIdsForNote(
+            @PathVariable Long companyId, @PathVariable Long noteId) {
+        Optional<Note> noteOpt = noteRepository.findById(noteId);
+        if (noteOpt.isEmpty()) return ResponseEntity.notFound().build();
+        Note note = noteOpt.get();
+        if (!note.getCompany().getId().equals(companyId)) return ResponseEntity.badRequest().build();
+        return ResponseEntity.ok(note.getVisibility() == Visibility.SPECIFIC_USERS ? note.getVisibleUserIds() : List.of());
+    }
+
+    @GetMapping("/all/{userId}")
+    public ResponseEntity<?> getAllNotesForUser(
+            @PathVariable Long companyId, @PathVariable Long userId,
+            @RequestParam(defaultValue = "false") boolean isAdmin,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        Optional<Company> companyOpt = companyRepository.findById(companyId);
+        if (companyOpt.isEmpty()) return ResponseEntity.badRequest().body("Invalid company ID");
+
+        List<Note> userNotes = noteDao.findNotesByUserIdAndCompanyId(userId, companyId);
+        List<Note> visibleNotes = noteDao.findNotesVisibleToUserAndCompany(userId, companyId, isAdmin);
+        List<Note> publicNotes = noteDao.findNotesByVisibilityInCompany(companyId, List.of(Visibility.ALL_USERS));
+
+        Map<Long, Note> uniqueNotes = new HashMap<>();
+        userNotes.forEach(n -> uniqueNotes.put(n.getId(), n));
+        visibleNotes.forEach(n -> uniqueNotes.put(n.getId(), n));
+        publicNotes.forEach(n -> uniqueNotes.put(n.getId(), n));
+
+        List<Note> allNotes = new ArrayList<>(uniqueNotes.values());
+        allNotes.sort(Comparator.comparing(Note::getCreatedAt).reversed());
+
+        int fromIndex = Math.min(page * size, allNotes.size());
+        int toIndex = Math.min(fromIndex + size, allNotes.size());
+        List<Note> pagedNotes = allNotes.subList(fromIndex, toIndex);
+
+        String username = userService.findUsernameByUserId(userId).orElse("Unknown User");
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("username", username);
+        response.put("notes", pagedNotes);
+        response.put("total", allNotes.size());
+        response.put("page", page);
+        response.put("size", size);
+
+        return ResponseEntity.ok(response);
     }
 }

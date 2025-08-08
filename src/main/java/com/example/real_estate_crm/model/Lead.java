@@ -2,15 +2,18 @@ package com.example.real_estate_crm.model;
 
 import com.fasterxml.jackson.annotation.*;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.List;
 
 @Entity
-@Table(name = "`lead`")
+@Table(name = "leads")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,17 +23,21 @@ public class Lead {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long leadId;
-    
-    @Column(nullable = false)
-    private String createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by", nullable = false)
+    @JsonIgnoreProperties({"email", "password", "role", "phone", "createdAt", "updatedAt", "company", "notes", "leads"})
+    private User createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id")
+    @JsonIgnore
+    private Company company;
 
     @NotBlank(message = "Name is required")
     @Column(nullable = false)
     private String name;
 
-    @NotBlank(message = "Email is required")
-    @Email(message = "Invalid email format")
-    @Column(nullable = false, unique = true)
     private String email;
 
     @NotBlank(message = "Phone number is required")
@@ -42,6 +49,9 @@ public class Lead {
     @Column(nullable = false)
     private String source;
 
+    @Column(name = "reference_name")
+    private String referenceName;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private LeadStatus status;
@@ -50,43 +60,69 @@ public class Lead {
     @Column(nullable = false)
     private Action action = Action.UNASSIGNED;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assigned_to")
-    @JsonBackReference // Prevent recursion on this side of the relationship
+    @ManyToOne
+    @JoinColumn(name = "assigned_to") // ya "assigned_user_id" jo tumhara DB column hai
+    @JsonBackReference("user-leads")  // ✅ match with User.java
     private User assignedTo;
-    
-   
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+    
+    @Column(nullable = true)
+    private String location;
+
 
     @Version
     private Long version;
 
-    @Column(precision = 15, scale = 2)
-    private String budget;
+    @Column(precision = 15, scale = 2, nullable = true)
+    private BigDecimal budget;
+
+
 
     @Column(columnDefinition = "TEXT")
     private String requirement;
 
-    @Column(columnDefinition = "TEXT")
-    private String remark;
+    @OneToMany(mappedBy = "lead", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<LeadRemark> remarks;
 
-    // Business Logic
+    // Only return minimal createdBy info
+    @JsonProperty("createdBy")
+    public UserSummary getCreatedBySummary() {
+        if (createdBy != null) {
+            return new UserSummary(createdBy.getUserId(), createdBy.getName());
+        }
+        return null;
+    }
+
+    @JsonProperty("assignedToSummary")
+    public UserSummary getAssignedToSummary() {
+        if (assignedTo != null) {
+            return new UserSummary(assignedTo.getUserId(), assignedTo.getName());
+        }
+        return null;
+    }
+
+    public Long getAssignedUserId() {
+        return (assignedTo != null) ? assignedTo.getUserId() : null;
+    }
+
+    @JsonProperty("createdByName")
+    public String getCreatedByName() {
+        return createdBy != null ? createdBy.getName() : "Unknown";
+    }
+
     public boolean isAssignable() {
         return this.action == Action.NEW || this.action == Action.UNASSIGNED;
     }
 
     public void assignTo(User user) {
-        if (user == null) {
-            throw new IllegalArgumentException("User cannot be null");
-        }
-        if (!isAssignable()) {
-            throw new IllegalStateException("Lead must be NEW or UNASSIGNED to be assigned");
-        }
+        if (user == null) throw new IllegalArgumentException("User cannot be null");
+        if (!isAssignable()) throw new IllegalStateException("Lead must be NEW or UNASSIGNED to be assigned");
         this.assignedTo = user;
         this.action = Action.ASSIGNED;
     }
@@ -98,30 +134,14 @@ public class Lead {
 
     @PrePersist
     public void prePersist() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = this.createdAt;
+        LocalDateTime nowKolkata = ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime();
+        this.createdAt = nowKolkata;
+        this.updatedAt = nowKolkata;
     }
 
     @PreUpdate
     public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    // ✅ Assigned user summary for frontend display
-    @JsonProperty("assignedToSummary")
-    public Object getAssignedToSummary() {
-        if (assignedTo != null) {
-            return new Object() {
-                public final Long userId = assignedTo.getUserId();
-                public final String name = assignedTo.getName();
-            };
-        }
-        return null;
-    }
-
-    // Getter for the assigned user ID (for the Lead class)
-    public Long getAssignedUserId() {
-        return (assignedTo != null) ? assignedTo.getUserId() : null;
+        this.updatedAt = ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime();
     }
 
     public enum Source {
@@ -133,6 +153,6 @@ public class Lead {
     }
 
     public enum LeadStatus {
-        NEW, CONTACTED, CLOSED
+        NEW, CONTACTED, CLOSED, DROPED
     }
 }

@@ -1,162 +1,239 @@
 package com.example.real_estate_crm.service.impl;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
+import com.example.real_estate_crm.model.Company;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import com.example.real_estate_crm.model.Lead;
-import com.example.real_estate_crm.model.Lead.Action;
+import com.example.real_estate_crm.model.Lead.LeadStatus;
+import com.example.real_estate_crm.model.Property;
 import com.example.real_estate_crm.model.User;
+import com.example.real_estate_crm.repository.CompanyRepository;
 import com.example.real_estate_crm.repository.LeadRepository;
 import com.example.real_estate_crm.repository.UserRepository;
 import com.example.real_estate_crm.service.dao.LeadDao;
 
-import jakarta.transaction.Transactional;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.PersistenceContext;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
 
 @Service
+@Transactional
+@RequiredArgsConstructor
 public class LeadDaoImpl implements LeadDao {
 
-    @Autowired
-    private LeadRepository leadRepository;
+    private final LeadRepository leadRepository;
+    private final UserRepository userRepository;
+    private final CompanyRepository companyRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+    @PersistenceContext
+    private EntityManager entityManager;
 
-    @Override
-    public List<Lead> getAllLeads() {
-        return leadRepository.findAll();
+    private void setTenantContext(Long companyId) {
+        // Implement context switch logic if needed for multitenancy (e.g., schema switching)
+    }
+
+    private Company getCompanyById(Long companyId) {
+        return companyRepository.findById(companyId)
+                .orElseThrow(() -> new EntityNotFoundException("Company not found with ID: " + companyId));
     }
 
     @Override
-    public Lead getById(Long id) {
-        return leadRepository.findById(id).orElse(null);
+    public List<Lead> getAllLeads(Long companyId) {
+        setTenantContext(companyId);
+        Company company = getCompanyById(companyId);
+        return leadRepository.findByCompany(company);
     }
 
     @Override
-    public Lead addLead(Lead lead) {
+    public Lead getById(Long companyId, Long id) {
+        setTenantContext(companyId);
+        Company company = getCompanyById(companyId);
+        return leadRepository.findByLeadIdAndCompany(id, company)
+                .orElseThrow(() -> new EntityNotFoundException("Lead not found with ID: " + id + " for company: " + companyId));
+    }
+
+    @Override
+    public Lead addLead(Long companyId, Lead lead) {
+        setTenantContext(companyId);
+        Company company = getCompanyById(companyId);
+        lead.setCompany(company);
         return leadRepository.save(lead);
     }
 
     @Override
-    public Lead updateLead(Lead lead) {
-        Lead existing = leadRepository.findById(lead.getLeadId())
-                .orElseThrow(() -> new RuntimeException("Lead not found with id: " + lead.getLeadId()));
-
+    public Lead updateLead(Long companyId, Lead lead) {
+        setTenantContext(companyId);
+        Company company = getCompanyById(companyId);
+        Lead existing = leadRepository.findByLeadIdAndCompany(lead.getLeadId(), company)
+                .orElseThrow(() -> new EntityNotFoundException("Lead not found with ID: " + lead.getLeadId() + " for company: " + companyId));
+        
+        // Update fields
         existing.setName(lead.getName());
         existing.setEmail(lead.getEmail());
         existing.setPhone(lead.getPhone());
         existing.setSource(lead.getSource());
+        existing.setReferenceName(lead.getReferenceName());
         existing.setStatus(lead.getStatus());
-
-        // ✅ New fields added
+        existing.setAction(lead.getAction());
+        existing.setAssignedTo(lead.getAssignedTo());
         existing.setBudget(lead.getBudget());
         existing.setRequirement(lead.getRequirement());
-        existing.setRemark(lead.getRemark());
-
-//        if (lead.getAssignedTo() != null) {
-//            existing.setAssignedTo(lead.getAssignedTo());
-//        } else {
-//            existing.setAssignedTo(null);
-//        }
-
-        // Optional: set updatedAt if you have such a field
-        existing.setUpdatedAt(LocalDateTime.now());
+        existing.setCreatedBy(lead.getCreatedBy());
 
         return leadRepository.save(existing);
     }
 
-
     @Override
-    public void deleteById(Long id) {
-        leadRepository.deleteById(id);
+    public void deleteById(Long companyId, Long id) {
+        setTenantContext(companyId);
+        Company company = getCompanyById(companyId);
+        Lead lead = leadRepository.findByLeadIdAndCompany(id, company)
+                .orElseThrow(() -> new EntityNotFoundException("Lead not found with ID: " + id + " for company: " + companyId));
+        leadRepository.delete(lead);
     }
 
     @Override
-    @Transactional
-    public Optional<Lead> assignLead(Long leadId, Long userId) {
-        Optional<Lead> leadOptional = leadRepository.findById(leadId);
-        if (leadOptional.isEmpty()) return Optional.empty();
-
-        Lead lead = leadOptional.get();
-        
-        if (!Lead.Action.NEW.equals(lead.getStatus()) && !Lead.Action.UNASSIGNED.equals(lead.getAction())) {
-            throw new IllegalStateException("Lead must be NEW or UNASSIGNED to be assigned");
+    public Optional<Lead> assignLead(Long companyId, Long leadId, Long userId) {
+        setTenantContext(companyId);
+        Company company = getCompanyById(companyId);
+        Optional<Lead> optionalLead = leadRepository.findByLeadIdAndCompany(leadId, company);
+        if (optionalLead.isPresent()) {
+            Lead lead = optionalLead.get();
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + userId));
+            lead.assignTo(user);
+            return Optional.of(leadRepository.save(lead));
         }
-
-        Optional<User> userOptional = userRepository.findById(userId);
-        if (userOptional.isEmpty()) return Optional.empty();
-
-        lead.assignTo(userOptional.get());  // uses your business logic method
-        return Optional.of(leadRepository.save(lead));
-    }
-
-
-    @Override
-    public Optional<Lead> unassignLead(Long leadId) {
-        return leadRepository.findById(leadId)
-                .map(lead -> {
-                    lead.setAssignedTo(null);
-                    lead.setAction(Action.UNASSIGNED);
-                    lead.setUpdatedAt(LocalDateTime.now());
-                    return leadRepository.save(lead);
-                });
-    }
-
-  
-    @Override
-    public List<Lead> getLeadsBySource(String source) {
-        return leadRepository.findAll().stream()
-                .filter(lead -> source.equalsIgnoreCase(lead.getSource()))
-                .toList();
-    }
-
- 
-    @Override
-    public List<Lead> getLeadsByAssignedUserId(Long userId) {
-        return leadRepository.findByAssignedTo(
-                userRepository.findById(userId).orElse(null)
-        );
+        return Optional.empty();
     }
 
     @Override
-    public List<Lead> searchLeadsByName(String name) {
-        return leadRepository.findAll().stream()
-                .filter(lead -> lead.getName() != null && lead.getName().toLowerCase().contains(name.toLowerCase()))
-                .toList();
+    public Optional<Lead> unassignLead(Long companyId, Long leadId) {
+        setTenantContext(companyId);
+        Company company = getCompanyById(companyId);
+        Optional<Lead> optionalLead = leadRepository.findByLeadIdAndCompany(leadId, company);
+        if (optionalLead.isPresent()) {
+            Lead lead = optionalLead.get();
+            lead.unassign();
+            return Optional.of(leadRepository.save(lead));
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public List<Lead> getLeadsByStatus(Long companyId, LeadStatus status) {
+        setTenantContext(companyId);
+        Company company = getCompanyById(companyId);
+        return leadRepository.findByStatusAndCompany(status, company);
+    }
+
+    @Override
+    public List<Lead> getLeadsBySource(Long companyId, String source) {
+        setTenantContext(companyId);
+        Company company = getCompanyById(companyId);
+        return leadRepository.findBySourceIgnoreCaseAndCompany(source, company);
+    }
+
+    @Override
+    public List<Lead> getLeadsByCreatedBy(Long companyId, String createdBy) {
+        setTenantContext(companyId);
+        Company company = getCompanyById(companyId);
+        Long userId = Long.parseLong(createdBy);
+        return leadRepository.findByCreatorIdAndCompany(userId, company);
+    }
+
+    @Override
+    public List<Lead> getLeadsByAssignedUserId(Long companyId, Long userId) {
+        setTenantContext(companyId);
+        Company company = getCompanyById(companyId);
+        return leadRepository.findByAssignedToUserIdAndCompany(userId, company);
+    }
+
+    @Override
+    public List<Lead> searchLeadsByName(Long companyId, String name) {
+        setTenantContext(companyId);
+        Company company = getCompanyById(companyId);
+        return leadRepository.findByNameContainingIgnoreCaseAndCompany(name, company);
+    }
+
+    @Override
+    public Optional<Lead> updateLeadStatus(Long companyId, Long leadId, LeadStatus status) {
+        setTenantContext(companyId);
+        Company company = getCompanyById(companyId);
+        Optional<Lead> optionalLead = leadRepository.findByLeadIdAndCompany(leadId, company);
+        if (optionalLead.isPresent()) {
+            Lead lead = optionalLead.get();
+            lead.setStatus(status);
+            return Optional.of(leadRepository.save(lead));
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public boolean updateStatus(Long companyId, Long leadId, String statusStr) {
+        setTenantContext(companyId);
+        Lead lead = entityManager.createQuery(
+                "SELECT l FROM Lead l WHERE l.company.id = :companyId AND l.leadId = :leadId", Lead.class)
+                .setParameter("companyId", companyId)
+                .setParameter("leadId", leadId)
+                .getSingleResult();
+
+        if (lead == null) return false;
+
+        try {
+            LeadStatus statusEnum = LeadStatus.valueOf(statusStr.toUpperCase());
+            lead.setStatus(statusEnum);
+            entityManager.merge(lead);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    @Override
+    public List<Lead> getLeadsPaginated(Long companyId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("leadId").descending());
+        Page<Lead> leadsPage = leadRepository.findByCompany_Id(companyId, pageable);
+        return leadsPage.getContent();
     }
     
     @Override
-    @Transactional
-    public Optional<Lead> updateLeadStatus(Long leadId, Lead.LeadStatus status) {
-        Optional<Lead> optionalLead = leadRepository.findById(leadId);
-        optionalLead.ifPresent(lead -> {
-            lead.setStatus(status); // ✅ set new status
-        });
-        return optionalLead;
+    public Page<Lead> getLeadsByAssignedUserId(Long companyId, Long userId, Pageable pageable) {
+        return leadRepository.findByCompanyIdAndAssignedTo_UserId(companyId, userId, pageable);
     }
-
+    
+    @Override
+    public Page<Lead> getLeadsByCreatedBy(Long companyId, String userId, Pageable pageable) {
+        return leadRepository.findByCompanyIdAndCreatedBy_UserId(companyId, Long.parseLong(userId), pageable);
+    }
 
     @Override
-    public List<Lead> getLeadsByStatus(String status) {
-        // Assuming you have a list of leads stored somewhere (e.g., in a database or a collection)
-        List<Lead> allLeads = getAllLeads(); // Example method to get all leads
-
-        // Use Java Streams to filter leads by the provided status
-        return allLeads.stream()
-                       .filter(lead -> lead.getStatus().equals(status))
-                       .collect(Collectors.toList());
+    public Page<Lead> searchLeads(Long companyId, String search, String status,
+                                  BigDecimal minBudget, BigDecimal maxBudget, Long createdBy,
+                                  String source, String action, Pageable pageable) {
+        return leadRepository.searchLeads(companyId, search, status, minBudget, maxBudget, createdBy, source, action, pageable);
     }
 
-	@Override
-	public List<Lead> getLeadsByCreatedBy(String createdBy) {
-		// TODO Auto-generated method stub
-		return leadRepository.findByCreatedBy(createdBy);
-	}
-    
+
+
+
+    public Page<Lead> searchLeadsCreatedOrAssigned(Long companyId, Long userId, String search, String status,
+            BigDecimal minBudget, BigDecimal maxBudget,
+            String source, String action, Pageable pageable) {
+return leadRepository.searchLeadsCreatedOrAssigned(companyId, userId, search, status, minBudget, maxBudget, source, action, pageable);
+}
+
 
 
 }

@@ -1,47 +1,63 @@
 package com.example.real_estate_crm.service.dao;
 
-import com.example.real_estate_crm.model.Lead;
+import com.example.real_estate_crm.dto.PropertySearchRequest;
 import com.example.real_estate_crm.model.Property;
 import com.example.real_estate_crm.model.Property.Status;
 
-import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
+
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 public interface PropertyDao {
 
-    List<Property> getAllProperties();
+    // 🏢 Get all properties for a specific company
+    List<Property> getAllProperties(Long companyId);
 
-    Property findById(Long id);
+    // 🔍 Find a property by ID and companyId to ensure ownership
+    Property findById(Long propertyId, Long companyId);
 
+    // ➕ Add a property (company must be set in the Property entity)
     Property addProperty(Property property);
 
+    // ✏️ Update a property (ensure company is respected)
     Property updateProperty(Property property);
 
-    void deleteById(Long id);
+    // ❌ Delete property by ID and companyId to ensure ownership
+    void deleteById(Long propertyId, Long companyId);
 
     // 🔍 Filter by property status: For Sale / Rent / Rent Out / Sold Out
-    List<Property> getPropertiesByStatus(Status status);
+    List<Property> getPropertiesByStatus(Long companyId, Status status);
 
     // 🔍 Filter by sector/area
-    List<Property> getPropertiesBySector(String sector);
+    List<Property> getPropertiesBySector(Long companyId, String sector);
 
     // 🔍 Filter by lead source: social media / cold call / project call / reference
-    List<Property> getPropertiesBySource(String source);
+    List<Property> getPropertiesBySource(Long companyId, String source);
 
-    // 🔍 Filter by price range - Adjusted to handle price as a string
-    List<Property> getPropertiesByPriceRange(String minPrice, String maxPrice);
+    // 🔍 Filter by price range (using Double instead of String for correctness)
 
-    // 🔍 Search by property name
-    List<Property> searchPropertiesByName(String name);
+    // 🔍 Search by property name (partial match)
+    List<Property> searchPropertiesByName(Long companyId, String name);
 
-    // 🔍 New: Filter by type (Commercial / Residential)
-    List<Property> getPropertiesByType(String type);
+    // 🔍 Filter by type (Commercial / Residential)
+    List<Property> getPropertiesByType(Long companyId, String type);
 
-    // 🔍 New: Filter by BHK (e.g., 1BHK, 2BHK)
-    List<Property> getPropertiesByBhk(String bhk);
+    // 🔍 Filter by BHK (e.g., 1BHK, 2BHK)
+    List<Property> getPropertiesByBhk(Long companyId, String bhk);
 
-    // 🔍 New: Filter by owner contact
-    List<Property> getPropertiesByOwnerContact(String contact);
-    List<Property> getPropertiesByCreatedBy(Long createdBy);
+    // 🔍 Filter by owner contact (partial match)
+    List<Property> getPropertiesByOwnerContact(Long companyId, String contact);
 
+    // 🔍 Filter by createdBy (creator user ID)
+    List<Property> getPropertiesByCreatedBy(Long companyId, Long createdBy);
+    
+    List<Property> advancedSearch(PropertySearchRequest request);
+    
+    Page<Property> advancedSearchPaged(PropertySearchRequest request, Pageable pageable);
+
+    
 }
