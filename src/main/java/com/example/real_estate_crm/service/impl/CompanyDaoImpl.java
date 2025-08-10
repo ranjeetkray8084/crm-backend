@@ -82,4 +82,13 @@ public class CompanyDaoImpl implements CompanyDao {
                 .setParameter("developer", developer)
                 .getResultList();
     }
+
+    /**
+     * Get total count of all companies.
+     */
+    @Override
+    public long getTotalCount() {
+        return entityManager.createQuery("SELECT COUNT(c) FROM Company c", Long.class)
+                .getSingleResult();
+    }
 }

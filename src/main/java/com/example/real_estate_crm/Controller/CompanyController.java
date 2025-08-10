@@ -109,4 +109,15 @@ public class CompanyController {
             return ResponseEntity.status(404).body("Company not found");
         }
     }
+
+    // ✅ 8. Get Total Companies Count (For DEVELOPER dashboard)
+    @GetMapping("/count")
+    public ResponseEntity<Long> getTotalCompaniesCount() {
+        try {
+            long totalCompanies = companyDao.getTotalCount();
+            return ResponseEntity.ok(totalCompanies);
+        } catch (Exception e) {
+            return ResponseEntity.ok(0L);
+        }
+    }
 }
