@@ -76,7 +76,8 @@ public class SecurityConfig {
                 "https://www.leadstracker.in",
                 "https://crm.leadstracker.in",
                 "http://localhost:5173",
-                "http://192.168.1.26:5173"
+                "http://192.168.1.26:5173",
+                "https://test.leadstracker.in"
 
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
