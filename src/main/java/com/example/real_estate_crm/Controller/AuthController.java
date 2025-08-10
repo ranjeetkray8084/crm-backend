@@ -11,11 +11,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
 
 import java.util.*;
 
 @RestController
 @RequestMapping("/api/auth")
+@CrossOrigin(origins = {
+    "https://leadstracker.in",
+    "https://www.leadstracker.in", 
+    "https://crm.leadstracker.in",
+    "https://test.leadstracker.in",
+    "http://localhost:5173"
+}, allowCredentials = "true")
 public class AuthController {
 
     @Autowired
