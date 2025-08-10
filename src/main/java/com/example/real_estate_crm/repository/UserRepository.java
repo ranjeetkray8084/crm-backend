@@ -17,18 +17,25 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // 🔐 Authentication
     Optional<User> findByEmail(String email);
+
     User findByEmailAndPassword(String email, String password);
+
     boolean existsByEmail(String email);
+
     boolean existsByPhone(String phone);
 
     // 🔍 Basic role-based queries
     List<User> findByRole(Role role);
+
     List<User> findByCompanyIdAndRole(Long companyId, Role role);
+
     List<User> findByCompany_Id(Long companyId);
 
     // 🔍 Admin-user relationship
     List<User> findByAdmin_UserId(Long adminId);
+
     List<User> findByCompanyIdAndAdmin_UserId(Long companyId, Long adminId);
+
     Optional<User> findByUserIdAndAdmin_UserId(Long userId, Long adminId);
 
     // 🔍 Director-level queries (admins with no admin)
@@ -41,20 +48,28 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // ✅ FIXED: Count by admin, company and status (with custom query)
     @Query("SELECT COUNT(u) FROM User u WHERE u.admin.userId = :adminId AND u.company.id = :companyId AND u.status = :status")
     long countUsersByAdminAndCompanyAndStatus(@Param("adminId") Long adminId,
-                                              @Param("companyId") Long companyId,
-                                              @Param("status") boolean status);
+            @Param("companyId") Long companyId,
+            @Param("status") boolean status);
 
     // 🔢 Role and status-based counts
     long countByCompany_Id(Long companyId); // total users
+
     long countByCompany_IdAndRole(Long companyId, Role role); // total by role
+
     long countByCompany_IdAndRoleAndStatusTrue(Long companyId, Role role); // active by role
+
     long countByCompany_IdAndRoleAndStatusFalse(Long companyId, Role role); // deactive by role
 
     // 🔢 Overall status counts
-    long countByCompany_IdAndStatusTrue(Long companyId);     // active users
-    long countByCompany_IdAndStatusFalse(Long companyId);    // deactive users
+    long countByCompany_IdAndStatusTrue(Long companyId); // active users
+
+    long countByCompany_IdAndStatusFalse(Long companyId); // deactive users
 
     // 🔍 Director user fetch
     long countByCompanyAndRole(Company company, Role role);
+
     User findByCompanyAndRole(Company company, Role role);
+
+    // 🔢 Global counts for DEVELOPER dashboard
+    long countByRole(Role role);
 }
