@@ -7,6 +7,7 @@ import com.example.real_estate_crm.model.User;
 import com.example.real_estate_crm.repository.FollowUpRepository;
 import com.example.real_estate_crm.repository.LeadRepository;
 import com.example.real_estate_crm.repository.UserRepository;
+import com.example.real_estate_crm.service.NotificationService;
 import com.example.real_estate_crm.service.dao.FollowUpDao;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,9 @@ public class FollowUpController {
     
     @Autowired
     private UserRepository userRepository;
+    
+    @Autowired
+    private NotificationService notificationService;
 
     // ✅ Get all follow-ups
     @GetMapping
@@ -61,6 +65,15 @@ public class FollowUpController {
         followUp.setCompany(lead.getCompany());
 
         FollowUp saved = followUpRepository.save(followUp);
+        
+        // 🔔 Send notification for follow-up creation - DISABLED
+        // try {
+        //     notificationService.sendFollowUpCreatedNotification(saved, user);
+        // } catch (Exception e) {
+        //     // Log error but don't fail the request
+        //     System.err.println("Failed to send follow-up notification: " + e.getMessage());
+        // }
+        
         return ResponseEntity.ok(saved);
     }
 

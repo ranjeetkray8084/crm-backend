@@ -72,6 +72,11 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 	);
 	long countByCompany_Id(Long companyId);
 	long countByCompany_IdAndStatus(Long companyId, LeadStatus closed);
+	
+	// ✅ New method to count leads with multiple statuses (CLOSED and DROPED)
+	@Query("SELECT COUNT(l) FROM Lead l WHERE l.company.id = :companyId AND l.status IN (:statuses)")
+	long countByCompany_IdAndStatusIn(@Param("companyId") Long companyId, @Param("statuses") List<LeadStatus> statuses);
+	
 	long countByCompanyIdAndAssignedToUserId(Long companyId, Long userId);
 	List<Lead> findByCompanyIdAndCreatedByUserId(Long companyId, Long userId);
 	List<Lead> findByCompanyIdAndAssignedToUserId(Long companyId, Long userId);
@@ -86,9 +91,17 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 		    LEFT JOIN users ato ON l.assigned_to = ato.user_id
 		    WHERE l.company_id = :companyId
 		      AND (
-		           :search IS NULL OR LOWER(l.name) LIKE CONCAT('%', LOWER(:search), '%')
+		           :search IS NULL OR 
+		           LOWER(l.name) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(l.phone) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.email) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(l.location) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.reference_name) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.requirement) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.source) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.status) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.action) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR CAST(l.budget AS CHAR) LIKE CONCAT('%', :search, '%')
 		           OR LOWER(cby.name) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(ato.name) LIKE CONCAT('%', LOWER(:search), '%')
 		      )
@@ -107,9 +120,17 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 		    LEFT JOIN users ato ON l.assigned_to = ato.user_id
 		    WHERE l.company_id = :companyId
 		      AND (
-		           :search IS NULL OR LOWER(l.name) LIKE CONCAT('%', LOWER(:search), '%')
+		           :search IS NULL OR 
+		           LOWER(l.name) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(l.phone) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.email) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(l.location) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.reference_name) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.requirement) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.source) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.status) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.action) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR CAST(l.budget AS CHAR) LIKE CONCAT('%', :search, '%')
 		           OR LOWER(cby.name) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(ato.name) LIKE CONCAT('%', LOWER(:search), '%')
 		      )
@@ -146,9 +167,17 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 		    WHERE l.company_id = :companyId
 		      AND (:userId IS NULL OR l.created_by = :userId OR l.assigned_to = :userId)
 		      AND (
-		           :search IS NULL OR LOWER(l.name) LIKE CONCAT('%', LOWER(:search), '%')
+		           :search IS NULL OR 
+		           LOWER(l.name) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(l.phone) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.email) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(l.location) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.reference_name) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.requirement) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.source) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.status) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.action) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR CAST(l.budget AS CHAR) LIKE CONCAT('%', :search, '%')
 		           OR LOWER(cby.name) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(ato.name) LIKE CONCAT('%', LOWER(:search), '%')
 		      )
@@ -167,9 +196,17 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 		    WHERE l.company_id = :companyId
 		      AND (:userId IS NULL OR l.created_by = :userId OR l.assigned_to = :userId)
 		      AND (
-		           :search IS NULL OR LOWER(l.name) LIKE CONCAT('%', LOWER(:search), '%')
+		           :search IS NULL OR 
+		           LOWER(l.name) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(l.phone) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.email) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(l.location) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.reference_name) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.requirement) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.source) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.status) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.action) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR CAST(l.budget AS CHAR) LIKE CONCAT('%', :search, '%')
 		           OR LOWER(cby.name) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(ato.name) LIKE CONCAT('%', LOWER(:search), '%')
 		      )
@@ -210,9 +247,17 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 		      )
 		      AND (:createdBy IS NULL OR l.created_by = :createdBy)
 		      AND (
-		          :search IS NULL OR LOWER(l.name) LIKE CONCAT('%', LOWER(:search), '%')
+		          :search IS NULL OR 
+		           LOWER(l.name) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(l.phone) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.email) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(l.location) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.reference_name) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.requirement) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.source) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.status) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.action) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR CAST(l.budget AS CHAR) LIKE CONCAT('%', :search, '%')
 		           OR LOWER(cby.name) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(ato.name) LIKE CONCAT('%', LOWER(:search), '%')
 		      )
@@ -236,9 +281,17 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 		      )
 		      AND (:createdBy IS NULL OR l.created_by = :createdBy)
 		      AND (
-		          :search IS NULL OR LOWER(l.name) LIKE CONCAT('%', LOWER(:search), '%')
+		          :search IS NULL OR 
+		           LOWER(l.name) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(l.phone) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.email) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(l.location) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.reference_name) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.requirement) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.source) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.status) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR LOWER(l.action) LIKE CONCAT('%', LOWER(:search), '%')
+		           OR CAST(l.budget AS CHAR) LIKE CONCAT('%', :search, '%')
 		           OR LOWER(cby.name) LIKE CONCAT('%', LOWER(:search), '%')
 		           OR LOWER(ato.name) LIKE CONCAT('%', LOWER(:search), '%')
 		      )
@@ -450,7 +503,117 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 	
 	@Query("SELECT COUNT(l) FROM Lead l WHERE l.company.id = :companyId AND l.status = :status AND l.createdBy.userId = :userId")
 	long countActiveLeadsByStatusAndCreatedBy(@Param("companyId") Long companyId, @Param("status") LeadStatus status, @Param("userId") Long userId);
+	
+	// Custom queries for USER role - count both created and assigned leads
+	@Query("SELECT COUNT(DISTINCT l) FROM Lead l WHERE l.company.id = :companyId AND l.status != 'DROPED' AND (l.createdBy.userId = :userId OR l.assignedTo.userId = :userId)")
+	long countActiveLeadsByCreatedByOrAssignedTo(@Param("companyId") Long companyId, @Param("userId") Long userId);
+	
+	@Query("SELECT COUNT(DISTINCT l) FROM Lead l WHERE l.company.id = :companyId AND l.status = :status AND (l.createdBy.userId = :userId OR l.assignedTo.userId = :userId)")
+	long countActiveLeadsByStatusAndCreatedByOrAssignedTo(@Param("companyId") Long companyId, @Param("status") LeadStatus status, @Param("userId") Long userId);
 
+
+	
+	// ✅ New method for multiple keywords search with AND logic
+	@Query(value = """
+		    SELECT l.lead_id, l.action, l.budget, l.created_at, l.created_by,
+		           l.email, l.name, l.phone, l.reference_name, l.requirement,
+		           l.source, l.status, l.updated_at, l.version,
+		           l.assigned_to, l.company_id, l.location
+		    FROM leads l
+		    LEFT JOIN users cby ON l.created_by = cby.user_id
+		    LEFT JOIN users ato ON l.assigned_to = ato.user_id
+		    WHERE l.company_id = :companyId
+		      AND (
+		           LOWER(l.name) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.phone) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.email) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.location) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.reference_name) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.requirement) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.source) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.status) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.action) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR CAST(l.budget AS CHAR) LIKE CONCAT('%', :keyword1, '%')
+		           OR LOWER(cby.name) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(ato.name) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		      )
+		      AND (
+		           LOWER(l.name) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.phone) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.email) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.location) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.reference_name) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.requirement) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.source) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.status) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.action) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR CAST(l.budget AS CHAR) LIKE CONCAT('%', :keyword2, '%')
+		           OR LOWER(cby.name) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(ato.name) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		      )
+		      AND (:status IS NULL OR l.status = :status)
+		      AND (:minBudget IS NULL OR l.budget >= :minBudget)
+		      AND (:maxBudget IS NULL OR l.budget <= :maxBudget)
+		      AND (:createdBy IS NULL OR l.created_by = :createdBy)
+		      AND (:source IS NULL OR l.source = :source)
+		      AND (:action IS NULL OR l.action = :action)
+		    ORDER BY l.created_at DESC
+		    """,
+		    countQuery = """
+		    SELECT COUNT(*)
+		    FROM leads l
+		    LEFT JOIN users cby ON l.created_by = cby.user_id
+		    LEFT JOIN users ato ON l.assigned_to = ato.user_id
+		    WHERE l.company_id = :companyId
+		      AND (
+		           LOWER(l.name) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.phone) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.email) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.location) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.reference_name) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.requirement) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.source) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.status) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(l.action) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR CAST(l.budget AS CHAR) LIKE CONCAT('%', :keyword1, '%')
+		           OR LOWER(cby.name) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		           OR LOWER(ato.name) LIKE CONCAT('%', LOWER(:keyword1), '%')
+		      )
+		      AND (
+		           LOWER(l.name) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.phone) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.email) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.location) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.reference_name) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.requirement) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.source) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.status) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(l.action) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR CAST(l.budget AS CHAR) LIKE CONCAT('%', :keyword2, '%')
+		           OR LOWER(cby.name) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		           OR LOWER(ato.name) LIKE CONCAT('%', LOWER(:keyword2), '%')
+		      )
+		      AND (:status IS NULL OR l.status = :status)
+		      AND (:minBudget IS NULL OR l.budget >= :minBudget)
+		      AND (:maxBudget IS NULL OR l.budget <= :maxBudget)
+		      AND (:createdBy IS NULL OR l.created_by = :createdBy)
+		      AND (:source IS NULL OR l.source = :source)
+		      AND (:action IS NULL OR l.action = :action)
+		    """,
+		    nativeQuery = true
+		)
+		Page<Lead> searchLeadsWithTwoKeywords(
+		    @Param("companyId") Long companyId,
+		    @Param("keyword1") String keyword1,
+		    @Param("keyword2") String keyword2,
+		    @Param("status") String status,
+		    @Param("minBudget") BigDecimal minBudget,
+		    @Param("maxBudget") BigDecimal maxBudget,
+		    @Param("createdBy") Long createdBy,
+		    @Param("source") String source,
+		    @Param("action") String action,
+		    Pageable pageable
+		);
 
 	
 }

@@ -384,7 +384,9 @@ public class LeadController {
     
     @GetMapping("/count/closed")
     public ResponseEntity<Long> countClosedLeads(@PathVariable Long companyId) {
-        long count = leadRepository.countByCompany_IdAndStatus(companyId, Lead.LeadStatus.CLOSED);
+        // Count both CLOSED and DROPED leads together
+        List<Lead.LeadStatus> statuses = List.of(Lead.LeadStatus.CLOSED, Lead.LeadStatus.DROPED);
+        long count = leadRepository.countByCompany_IdAndStatusIn(companyId, statuses);
         return ResponseEntity.ok(count);
     }
 
@@ -459,16 +461,25 @@ public class LeadController {
     @GetMapping("/search")
     public Page<Lead> getLeads(
         @PathVariable Long companyId,
-        @RequestParam(required = false) String search,
+        @RequestParam(required = false) List<String> keywords,
         @RequestParam(required = false) String status,
         @RequestParam(required = false) BigDecimal minBudget,
         @RequestParam(required = false) BigDecimal maxBudget,
         @RequestParam(required = false) Long createdBy,
         @RequestParam(required = false) String source,  // ✅ NEW
-        @RequestParam(required = false) String action,  // ✅ NEW
+        @RequestParam(required = false) String action,  // ✅ NEW - handles ASSIGNED/UNASSIGNED
         Pageable pageable
     ) {
-        return leadService.searchLeads(companyId, search, status, minBudget, maxBudget, createdBy, source, action, pageable);
+        // For multiple keywords, use the new method that handles two keywords
+        if (keywords != null && keywords.size() >= 2) {
+            return leadRepository.searchLeadsWithTwoKeywords(companyId, keywords.get(0), keywords.get(1), status, minBudget, maxBudget, createdBy, source, action, pageable);
+        } else if (keywords != null && keywords.size() == 1) {
+            // Single keyword - use the original method
+            return leadService.searchLeads(companyId, keywords.get(0), status, minBudget, maxBudget, createdBy, source, action, pageable);
+        } else {
+            // No keywords - use the original method
+            return leadService.searchLeads(companyId, null, status, minBudget, maxBudget, createdBy, source, action, pageable);
+        }
     }
 
     
@@ -476,7 +487,7 @@ public class LeadController {
     public Page<Lead> searchLeadsCreatedOrAssignedToUser(
         @PathVariable Long companyId,
         @PathVariable Long userId,
-        @RequestParam(required = false) String search,
+        @RequestParam(required = false) List<String> keywords,
         @RequestParam(required = false) String status,
         @RequestParam(required = false) BigDecimal minBudget,
         @RequestParam(required = false) BigDecimal maxBudget,
@@ -484,7 +495,15 @@ public class LeadController {
         @RequestParam(required = false) String action,
         Pageable pageable
     ) {
-        return leadRepository.searchLeadsCreatedOrAssigned(companyId, userId, search, status, minBudget, maxBudget, source, action, pageable);
+        // For multiple keywords, create a search string that matches any of the keywords
+        String searchString = null;
+        if (keywords != null && !keywords.isEmpty()) {
+            // Create a search pattern that matches any of the keywords
+            // This will be handled by the SQL LIKE conditions
+            searchString = keywords.get(0); // Use first keyword for now
+        }
+        
+        return leadRepository.searchLeadsCreatedOrAssigned(companyId, userId, searchString, status, minBudget, maxBudget, source, action, pageable);
     }
 
 
@@ -493,7 +512,7 @@ public class LeadController {
         @PathVariable Long companyId,
         @PathVariable Long adminId,
         @RequestParam(required = false) Long createdBy,  // 👈 Added this
-        @RequestParam(required = false) String search,
+        @RequestParam(required = false) List<String> keywords,
         @RequestParam(required = false) String status,
         @RequestParam(required = false) BigDecimal minBudget,
         @RequestParam(required = false) BigDecimal maxBudget,
@@ -501,11 +520,19 @@ public class LeadController {
         @RequestParam(required = false) String action,
         Pageable pageable
     ) {
+        // For multiple keywords, create a search string that matches any of the keywords
+        String searchString = null;
+        if (keywords != null && !keywords.isEmpty()) {
+            // Create a search pattern that matches any of the keywords
+            // This will be handled by the SQL LIKE conditions
+            searchString = keywords.get(0); // Use first keyword for now
+        }
+        
         return leadRepository.searchLeadsVisibleToAdmin(
             companyId,
             adminId,
             createdBy,   // 👈 Pass it here too
-            search,
+            searchString,
             status,
             minBudget,
             maxBudget,
@@ -577,7 +604,7 @@ public class LeadController {
             response.put("contactedLeads", contacted);
             response.put("closedLeads", closed);
             response.put("droppedLeads", dropped);
-            response.put("totalClose", closed); // For deals overview
+            response.put("totalClose", closed + dropped); // For deals overview - combined closed and dropped
 
         } else if (role == User.Role.ADMIN) {
             // 🔹 ADMIN → createdBy admin or assignedTo admin + all assigned users under admin (excluding DROPPED)
@@ -599,22 +626,22 @@ public class LeadController {
             response.put("contactedLeads", contacted);
             response.put("closedLeads", closed);
             response.put("droppedLeads", dropped);
-            response.put("totalClose", closed); // For deals overview
+            response.put("totalClose", closed + dropped); // For deals overview - combined closed and dropped
 
         } else if (role == User.Role.USER) {
-            // 🔹 USER → only leads created by user (excluding DROPPED)
-            long total = leadRepository.countActiveLeadsByCreatedBy(companyId, userId);
-            long newLeads = leadRepository.countActiveLeadsByStatusAndCreatedBy(companyId, Lead.LeadStatus.NEW, userId);
-            long contacted = leadRepository.countActiveLeadsByStatusAndCreatedBy(companyId, Lead.LeadStatus.CONTACTED, userId);
-            long closed = leadRepository.countActiveLeadsByStatusAndCreatedBy(companyId, Lead.LeadStatus.CLOSED, userId);
-            long dropped = leadRepository.countActiveLeadsByStatusAndCreatedBy(companyId, Lead.LeadStatus.DROPED, userId);
+            // 🔹 USER → leads created by user OR assigned to user (excluding DROPPED)
+            long total = leadRepository.countActiveLeadsByCreatedByOrAssignedTo(companyId, userId);
+            long newLeads = leadRepository.countActiveLeadsByStatusAndCreatedByOrAssignedTo(companyId, Lead.LeadStatus.NEW, userId);
+            long contacted = leadRepository.countActiveLeadsByStatusAndCreatedByOrAssignedTo(companyId, Lead.LeadStatus.CONTACTED, userId);
+            long closed = leadRepository.countActiveLeadsByStatusAndCreatedByOrAssignedTo(companyId, Lead.LeadStatus.CLOSED, userId);
+            long dropped = leadRepository.countActiveLeadsByStatusAndCreatedByOrAssignedTo(companyId, Lead.LeadStatus.DROPED, userId);
 
             response.put("totalLeads", total);
             response.put("newLeads", newLeads);
             response.put("contactedLeads", contacted);
             response.put("closedLeads", closed);
             response.put("droppedLeads", dropped);
-            response.put("totalClose", closed); // For deals overview
+            response.put("totalClose", closed + dropped); // For deals overview - combined closed and dropped
         }
 
         return ResponseEntity.ok(response);

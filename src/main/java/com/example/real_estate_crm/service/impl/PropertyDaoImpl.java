@@ -86,12 +86,12 @@ public class PropertyDaoImpl implements PropertyDao {
 
     @Override
     public List<Property> getPropertiesBySector(Long companyId, String sector) {
-        return propertyRepository.findByCompany_IdAndBhkIgnoreCase(companyId, sector);
+        return propertyRepository.findByCompany_IdAndSectorIgnoreCase(companyId, sector);
     }
 
     @Override
     public List<Property> getPropertiesBySource(Long companyId, String source) {
-        return propertyRepository.findByCompany_IdAndBhkIgnoreCase(companyId, source);
+        return propertyRepository.findByCompany_IdAndSourceIgnoreCase(companyId, source);
     }
 
     private BigDecimal parsePrice(String price) {
@@ -116,15 +116,12 @@ public class PropertyDaoImpl implements PropertyDao {
 
     @Override
     public List<Property> searchPropertiesByName(Long companyId, String name) {
-        return propertyRepository.findByCompany_Id(companyId).stream()
-                .filter(property -> property.getPropertyName() != null &&
-                        property.getPropertyName().toLowerCase().contains(name.toLowerCase()))
-                .collect(Collectors.toList());
+        return propertyRepository.findByCompany_IdAndPropertyNameContainingIgnoreCase(companyId, name);
     }
 
     @Override
     public List<Property> getPropertiesByType(Long companyId, String type) {
-        return propertyRepository.findByCompany_IdAndBhkIgnoreCase(companyId, type);
+        return propertyRepository.findByCompany_IdAndTypeIgnoreCase(companyId, type);
     }
 
     @Override

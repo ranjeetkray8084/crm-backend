@@ -31,6 +31,14 @@ public interface FollowUpRepository extends JpaRepository<FollowUp, Long> {
         @Param("endOfDay") LocalDateTime endOfDay
     );
 
+    // ✅ Get all follow-ups for today across all companies (for daily reminders)
+    @Query("SELECT f FROM FollowUp f " +
+           "WHERE f.followupDate BETWEEN :startOfDay AND :endOfDay")
+    List<FollowUp> findAllTodayFollowUps(
+        @Param("startOfDay") LocalDateTime startOfDay,
+        @Param("endOfDay") LocalDateTime endOfDay
+    );
+
     // ✅ Fetch follow-ups between two dates
     List<FollowUp> findByFollowupDateBetween(LocalDateTime start, LocalDateTime end);
 }

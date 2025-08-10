@@ -29,6 +29,9 @@ public interface PropertyRepository extends JpaRepository<Property, Long>, JpaSp
     // Find by company and source
     List<Property> findByCompany_IdAndSourceIgnoreCase(Long companyId, String source);
 
+    // Search properties by name containing
+    List<Property> findByCompany_IdAndPropertyNameContainingIgnoreCase(Long companyId, String propertyName);
+
     // Find by company, creator, and status
     List<Property> findByCompany_IdAndCreatedBy_UserIdAndStatus(Long companyId, Long createdByUserId, Property.Status status);
 

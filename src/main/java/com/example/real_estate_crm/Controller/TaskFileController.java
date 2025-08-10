@@ -178,10 +178,48 @@ public class TaskFileController {
 
     // ✅ 4. Get Assigned Tasks
     @GetMapping("/assigned")
-    public ResponseEntity<List<TaskFile>> getAssignedFiles(@RequestParam Long companyId,
+    public ResponseEntity<List<TaskFileDTO>> getAssignedFiles(@RequestParam Long companyId,
                                                            @RequestParam Long userId) {
         List<TaskFile> assignedFiles = taskrepo.findByCompanyIdAndAssignedToOrderByUploadDateDesc(companyId, userId);
-        return ResponseEntity.ok(assignedFiles);
+
+        // Extract all unique user IDs (assignedTo and uploadedBy) to minimize DB calls
+        Set<Long> allUserIds = assignedFiles.stream()
+                .map(task -> {
+                    Set<Long> ids = new HashSet<>();
+                    if (task.getAssignedTo() != null) ids.add(task.getAssignedTo());
+                    if (task.getUploadedBy() != null) ids.add(task.getUploadedBy().getUserId());
+                    return ids;
+                })
+                .flatMap(Set::stream)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // Fetch user summaries in one go
+        Map<Long, UserSummary> userMap = userRepository.findAllById(allUserIds).stream()
+                .collect(Collectors.toMap(
+                        User::getUserId,
+                        user -> new UserSummary(user.getUserId(), user.getName())
+                ));
+
+        // Build DTOs
+        List<TaskFileDTO> dtos = assignedFiles.stream()
+                .map(task -> TaskFileDTO.builder()
+                        .id(task.getId())
+                        .title(task.getTitle())
+                        .uploadDate(task.getUploadDate())
+                        .assignedTo(
+                                task.getAssignedTo() != null ? userMap.get(task.getAssignedTo()) : null
+                        )
+                        .uploadedByName(
+                                task.getUploadedBy() != null && userMap.containsKey(task.getUploadedBy().getUserId())
+                                        ? userMap.get(task.getUploadedBy().getUserId()).getName()
+                                        : "Unknown" // Fallback if uploader is null or not found
+                        )
+                        .build()
+                )
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(dtos);
     }
 
     // ✅ 5. Update Cell in Excel File
