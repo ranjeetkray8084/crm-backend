@@ -229,6 +229,13 @@ public class PropertyController {
 
         List<PropertyDTO> filteredProperties = propertiesPage.getContent().stream()
                 .map((Property property) -> {
+                    // Handle null createdBy to prevent NullPointerException
+                    if (property.getCreatedBy() == null) {
+                        // If createdBy is null, hide sensitive info for all users except DIRECTOR
+                        boolean hideSensitive = !"DIRECTOR".equals(role);
+                        return PropertyDTO.from(property, hideSensitive);
+                    }
+                    
                     Long createdById = property.getCreatedBy().getUserId();
 
                     boolean hideSensitive = switch (role) {
@@ -362,7 +369,7 @@ public class PropertyController {
             @RequestParam(required = false) BigDecimal maxPrice,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam Long userId // 🆕 Added userId for visibility control
+            @RequestParam(required = false) Long userId // 🆕 Added userId for visibility control
     ) {
         Optional<User> optionalUser = userRepository.findById(userId);
         if (optionalUser.isEmpty()) {
@@ -388,6 +395,13 @@ public class PropertyController {
 
         List<PropertyDTO> filteredProperties = propertiesPage.getContent().stream()
                 .map((Property property) -> {
+                    // Handle null createdBy to prevent NullPointerException
+                    if (property.getCreatedBy() == null) {
+                        // If createdBy is null, hide sensitive info for all users except DIRECTOR
+                        boolean hideSensitive = !"DIRECTOR".equals(role);
+                        return PropertyDTO.from(property, hideSensitive);
+                    }
+                    
                     Long createdById = property.getCreatedBy().getUserId();
 
                     boolean hideSensitive = switch (role) {

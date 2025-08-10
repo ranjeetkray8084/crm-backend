@@ -23,7 +23,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity  
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Autowired
@@ -32,28 +32,28 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .cors()
-            .and()
-            .csrf().disable()
-            .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            .and()
-            .authorizeHttpRequests()
-            .requestMatchers(
-                "/", "/index.html",
-                "/assets/**",
-                "/pages/**",
-                "/favicon.ico",
-                "/version.json",
-                "/api/auth/**",
-                "/api/contact"  // ✅ Allow unauthenticated access to contact API
-            ).permitAll()
-            .anyRequest().authenticated()
-            .and()
-            .exceptionHandling()
-            .authenticationEntryPoint((request, response, authException) ->
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"))
-            .and()
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                .cors()
+                .and()
+                .csrf().disable()
+                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .and()
+                .authorizeHttpRequests()
+                .requestMatchers(
+                        "/", "/index.html",
+                        "/assets/**",
+                        "/pages/**",
+                        "/favicon.ico",
+                        "/version.json",
+                        "/api/auth/**",
+                        "/api/contact" // ✅ Allow unauthenticated access to contact API
+                ).permitAll()
+                .anyRequest().authenticated()
+                .and()
+                .exceptionHandling()
+                .authenticationEntryPoint((request, response, authException) -> response
+                        .sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"))
+                .and()
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -65,18 +65,18 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(13); 
+        return new BCryptPasswordEncoder(13);
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(
-            "https://leadstracker.in",
-            "https://www.leadstracker.in",
-            "https://crm.leadstracker.in",
-            "http://localhost:5173",
-            "http://192.168.1.26:5173"
+                "https://leadstracker.in",
+                "https://www.leadstracker.in",
+                "https://crm.leadstracker.in",
+                "http://localhost:5173",
+                "http://192.168.1.26:5173"
 
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));

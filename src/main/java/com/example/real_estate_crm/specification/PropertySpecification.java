@@ -37,7 +37,12 @@ public class PropertySpecification {
 
             // ✅ Status filter
             if (request.getStatus() != null) {
-                predicates.add(cb.equal(cb.lower(root.get("status")), request.getStatus().toLowerCase()));
+                try {
+                    Property.Status statusEnum = Property.Status.valueOf(request.getStatus().toUpperCase());
+                    predicates.add(cb.equal(root.get("status"), statusEnum));
+                } catch (IllegalArgumentException e) {
+                    // If status is not valid enum, ignore this filter
+                }
             }
 
             // ✅ Source filter
@@ -45,10 +50,10 @@ public class PropertySpecification {
                 predicates.add(cb.equal(cb.lower(root.get("source")), request.getSource().toLowerCase()));
             }
 
-            // ✅ CreatedBy filter (id se)
+            // ✅ CreatedBy filter (userId se)
             if (request.getCreatedBy() != null) {
                 Join<Object, Object> createdByJoin = root.join("createdBy", JoinType.LEFT);
-                predicates.add(cb.equal(createdByJoin.get("id"), request.getCreatedBy()));
+                predicates.add(cb.equal(createdByJoin.get("userId"), request.getCreatedBy()));
             }
 
             // ✅ Keyword search
