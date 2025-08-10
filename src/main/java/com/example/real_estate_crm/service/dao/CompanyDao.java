@@ -22,4 +22,6 @@ public interface CompanyDao {
 
 	List<Company> findByDeveloper(User developer);
 
+	long getTotalCount();
+
 }

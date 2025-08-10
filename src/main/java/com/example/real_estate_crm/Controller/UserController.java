@@ -368,7 +368,35 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-
-
+    // ✅ Developer Dashboard Endpoints
     
+    @GetMapping("/total-count")
+    public ResponseEntity<Long> getTotalUsersCount() {
+        try {
+            long totalUsers = userRepository.count();
+            return ResponseEntity.ok(totalUsers);
+        } catch (Exception e) {
+            return ResponseEntity.ok(0L);
+        }
+    }
+
+    @GetMapping("/admins/total-count")
+    public ResponseEntity<Long> getTotalAdminsCount() {
+        try {
+            long totalAdmins = userRepository.countByRole(Role.ADMIN);
+            return ResponseEntity.ok(totalAdmins);
+        } catch (Exception e) {
+            return ResponseEntity.ok(0L);
+        }
+    }
+
+    @GetMapping("/directors/total-count")
+    public ResponseEntity<Long> getTotalDirectorsCount() {
+        try {
+            long totalDirectors = userRepository.countByRole(Role.DIRECTOR);
+            return ResponseEntity.ok(totalDirectors);
+        } catch (Exception e) {
+            return ResponseEntity.ok(0L);
+        }
+    }
 }
