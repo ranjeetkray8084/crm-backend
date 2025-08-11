@@ -87,6 +87,22 @@ public class UserDaoImpl implements UserDao {
         User existingUser = userRepository.findById(user.getUserId())
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + user.getUserId()));
 
+        // Check if email is being changed and if it already exists for another user
+        if (!existingUser.getEmail().equals(user.getEmail())) {
+            Optional<User> userWithEmail = userRepository.findByEmailAndUserIdNot(user.getEmail(), user.getUserId());
+            if (userWithEmail.isPresent()) {
+                throw new IllegalArgumentException("Email already exists");
+            }
+        }
+
+        // Check if phone is being changed and if it already exists for another user
+        if (!existingUser.getPhone().equals(user.getPhone())) {
+            Optional<User> userWithPhone = userRepository.findByPhoneAndUserIdNot(user.getPhone(), user.getUserId());
+            if (userWithPhone.isPresent()) {
+                throw new IllegalArgumentException("Phone number already exists");
+            }
+        }
+
         existingUser.setName(user.getName());
         existingUser.setEmail(user.getEmail());
         existingUser.setPhone(user.getPhone());

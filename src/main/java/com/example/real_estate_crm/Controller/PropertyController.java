@@ -55,52 +55,81 @@ public class PropertyController {
     
     @PostMapping
     public ResponseEntity<?> createProperty(@PathVariable Long companyId, @RequestBody Property property) {
+        System.out.println("🔄 Creating property for company: " + companyId);
+        System.out.println("🏠 Property data: " + property.getPropertyName() + " - " + property.getType());
+        
         if (property.getCreatedBy() == null || property.getCreatedBy().getUserId() == null) {
+            System.out.println("❌ Missing createdBy.userId");
             return ResponseEntity
-                    .status(HttpStatus.UNAUTHORIZED)
+                    .status(HttpStatus.BAD_REQUEST)
                     .body("❌ Please login before creating a property.");
         }
 
         Long userId = property.getCreatedBy().getUserId();
+        System.out.println("👤 Creating property for user: " + userId);
+        
         Optional<User> optionalUser = userService.findById(userId);
         if (optionalUser.isEmpty()) {
+            System.out.println("❌ User not found: " + userId);
             return ResponseEntity
                     .status(HttpStatus.UNAUTHORIZED)
                     .body("❌ Invalid user. Please login again.");
         }
 
         User creator = optionalUser.get();
+        System.out.println("✅ User found: " + creator.getName() + " (" + creator.getRole() + ")");
+        
         property.setCreatedBy(creator);
 
         Company company = new Company();
         company.setId(companyId);
         property.setCompany(company);
 
-        Property created = propertyService.addProperty(property);
+        try {
+            System.out.println("💾 Saving property to database...");
+            Property created = propertyService.addProperty(property);
+            System.out.println("✅ Property saved successfully with ID: " + created.getPropertyId());
 
-        String message = "📢 A new property \"" + created.getPropertyName() + "\" was created by " + creator.getName();
+            // Notification Logic
+            try {
+                String message = "📢 A new property \"" + created.getPropertyName() + "\" was created by " + creator.getName();
 
-        if (creator.getRole() == User.Role.USER) {
-            // Notify creator's admin
-            if (creator.getAdmin() != null) {
-                notificationService.sendNotification(creator.getAdmin().getUserId(), company, message);
+                if (creator.getRole() == User.Role.USER) {
+                    // Notify creator's admin
+                    if (creator.getAdmin() != null) {
+                        notificationService.sendNotification(creator.getAdmin().getUserId(), company, message);
+                        System.out.println("📧 Notification sent to admin: " + creator.getAdmin().getName());
+                    }
+
+                    // Notify director of the company
+                    User director = userService.findDirectorByCompany(company);
+                    if (director != null) {
+                        notificationService.sendNotification(director.getUserId(), company, message);
+                        System.out.println("📧 Notification sent to director: " + director.getName());
+                    }
+
+                } else if (creator.getRole() == User.Role.ADMIN) {
+                    // Only notify director
+                    User director = userService.findDirectorByCompany(company);
+                    if (director != null) {
+                        notificationService.sendNotification(director.getUserId(), company, message);
+                        System.out.println("📧 Notification sent to director: " + director.getName());
+                    }
+                }
+            } catch (Exception notificationEx) {
+                System.out.println("⚠️ Notification failed but property created: " + notificationEx.getMessage());
+                // Don't fail the entire operation if notification fails
             }
 
-            // Notify director of the company
-            User director = userService.findDirectorByCompany(company);
-            if (director != null) {
-                notificationService.sendNotification(director.getUserId(), company, message);
-            }
-
-        } else if (creator.getRole() == User.Role.ADMIN) {
-            // Only notify director
-            User director = userService.findDirectorByCompany(company);
-            if (director != null) {
-                notificationService.sendNotification(director.getUserId(), company, message);
-            }
+            System.out.println("🎉 Property creation completed successfully");
+            return ResponseEntity.status(HttpStatus.CREATED).body(created);
+            
+        } catch (Exception ex) {
+            System.out.println("❌ Error creating property: " + ex.getMessage());
+            ex.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("❌ Failed to create property: " + ex.getMessage());
         }
-
-        return ResponseEntity.ok(created);
     }
 
 

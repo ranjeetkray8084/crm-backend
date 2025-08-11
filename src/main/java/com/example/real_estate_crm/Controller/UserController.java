@@ -39,7 +39,7 @@ public class UserController {
     public ResponseEntity<String> getUsernameById(@PathVariable Long id) {
         Optional<User> user = userDao.getUserById(id);
         return user.map(value -> ResponseEntity.ok(value.getName()))
-                   .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found"));
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found"));
     }
 
     @GetMapping("/user-role")
@@ -76,18 +76,31 @@ public class UserController {
 
     @GetMapping("/admin-role/{companyId}")
     public List<UserDTO> getAllUsersWithAdminRole(@PathVariable Long companyId) {
-        return userRepository.findByCompanyIdAndRole(companyId, Role.ADMIN).stream().map(UserDTO::new).collect(Collectors.toList());
+        return userRepository.findByCompanyIdAndRole(companyId, Role.ADMIN).stream().map(UserDTO::new)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/role/{companyId}/{role}")
     public List<UserDTO> getUsersByRole(@PathVariable Long companyId, @PathVariable Role role) {
-        return userRepository.findByCompanyIdAndRole(companyId, role).stream().map(UserDTO::new).collect(Collectors.toList());
+        return userRepository.findByCompanyIdAndRole(companyId, role).stream().map(UserDTO::new)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<UserDTO> getUserById(@PathVariable Long id) {
-        Optional<User> user = userDao.getUserById(id);
-        return user.map(value -> ResponseEntity.ok(new UserDTO(value))).orElseGet(() -> ResponseEntity.notFound().build());
+        try {
+            Optional<User> user = userDao.getUserById(id);
+            if (user.isPresent()) {
+                return ResponseEntity.ok(new UserDTO(user.get()));
+            } else {
+                System.out.println("❌ User not found with ID: " + id);
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            System.out.println("❌ Error getting user by ID " + id + ": " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @PostMapping
@@ -115,12 +128,16 @@ public class UserController {
             // Step 3: Limit checks
             long existingCount = userRepository.countByCompanyAndRole(company, user.getRole());
 
-            if (user.getRole() == Role.USER && company.getMaxUsers() != null && existingCount >= company.getMaxUsers()) {
-                return ResponseEntity.badRequest().body("❌ User creation failed: Max user limit reached for this company.");
+            if (user.getRole() == Role.USER && company.getMaxUsers() != null
+                    && existingCount >= company.getMaxUsers()) {
+                return ResponseEntity.badRequest()
+                        .body("❌ User creation failed: Max user limit reached for this company.");
             }
 
-            if (user.getRole() == Role.ADMIN && company.getMaxAdmins() != null && existingCount >= company.getMaxAdmins()) {
-                return ResponseEntity.badRequest().body("❌ Admin creation failed: Max admin limit reached for this company.");
+            if (user.getRole() == Role.ADMIN && company.getMaxAdmins() != null
+                    && existingCount >= company.getMaxAdmins()) {
+                return ResponseEntity.badRequest()
+                        .body("❌ Admin creation failed: Max admin limit reached for this company.");
             }
 
             // Step 4: Save user
@@ -136,19 +153,65 @@ public class UserController {
     }
 
     @PutMapping("/update-profile/{id}")
-    public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody User user) {
+    public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody User user, HttpServletResponse response) {
+        System.out.println("🔄 Updating user profile for ID: " + id);
+        System.out.println("📧 New email: " + user.getEmail());
+
         Optional<User> optionalUser = userDao.findById(id);
         if (optionalUser.isEmpty()) {
+            System.out.println("❌ User not found with ID: " + id);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
         }
 
         User existingUser = optionalUser.get();
+        System.out.println("📧 Current email: " + existingUser.getEmail());
+
+        boolean emailChanged = !existingUser.getEmail().equals(user.getEmail());
+
         existingUser.setName(user.getName());
         existingUser.setEmail(user.getEmail());
         existingUser.setPhone(user.getPhone());
         existingUser.setRole(user.getRole());
-        userDao.updateUser(existingUser);
-        return ResponseEntity.ok(new UserDTO(existingUser));
+
+        try {
+            User updatedUser = userDao.updateUser(existingUser);
+            System.out.println("✅ User updated successfully: " + updatedUser.getEmail());
+
+            Map<String, Object> responseBody = new HashMap<>();
+            responseBody.put("message", "User updated successfully");
+            responseBody.put("user", new UserDTO(updatedUser));
+
+            // If email changed, generate new JWT token
+            if (emailChanged) {
+                System.out.println("📧 Email changed, generating new JWT token");
+                String newToken = jwtUtil.generateToken(updatedUser.getEmail());
+
+                // Set new token in cookie
+                ResponseCookie accessCookie = ResponseCookie.from("accessToken", newToken)
+                        .httpOnly(true)
+                        .secure(true)
+                        .path("/")
+                        .maxAge(60 * 60 * 24 * 7) // 7 days
+                        .sameSite("Strict")
+                        .build();
+
+                response.setHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
+
+                // Also return new token in response body
+                responseBody.put("newToken", newToken);
+                responseBody.put("tokenUpdated", true);
+            }
+
+            return ResponseEntity.ok(responseBody);
+        } catch (IllegalArgumentException e) {
+            System.out.println("❌ Validation error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (Exception e) {
+            System.out.println("❌ Unexpected error: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to update user: " + e.getMessage());
+        }
     }
 
     @DeleteMapping("/{id}")
@@ -159,8 +222,8 @@ public class UserController {
 
     @PostMapping("/{id}/upload-avatar")
     public ResponseEntity<String> uploadAvatar(@PathVariable Long id,
-                                               @RequestParam("avatar") MultipartFile file,
-                                               @RequestParam("avatarName") String avatarName) {
+            @RequestParam("avatar") MultipartFile file,
+            @RequestParam("avatarName") String avatarName) {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body("No file uploaded");
         }
@@ -192,7 +255,8 @@ public class UserController {
 
     @GetMapping("/company/{companyId}")
     public ResponseEntity<List<UserDTO>> getUsersByCompanyId(@PathVariable Long companyId) {
-        List<UserDTO> users = userRepository.findByCompany_Id(companyId).stream().map(UserDTO::new).collect(Collectors.toList());
+        List<UserDTO> users = userRepository.findByCompany_Id(companyId).stream().map(UserDTO::new)
+                .collect(Collectors.toList());
         return ResponseEntity.ok(users);
     }
 
@@ -233,7 +297,8 @@ public class UserController {
 
     @GetMapping("/admin/{adminId}/users")
     public ResponseEntity<List<UserDTO>> getUsersByAdminId(@PathVariable Long adminId) {
-        List<UserDTO> users = userDao.findUsersByAdminId(adminId).stream().map(UserDTO::new).collect(Collectors.toList());
+        List<UserDTO> users = userDao.findUsersByAdminId(adminId).stream().map(UserDTO::new)
+                .collect(Collectors.toList());
         return ResponseEntity.ok(users);
     }
 
@@ -249,13 +314,15 @@ public class UserController {
 
     @GetMapping("/company/{companyId}/admins")
     public ResponseEntity<List<UserDTO>> getAdminsByCompany(@PathVariable Long companyId) {
-        List<UserDTO> admins = userDao.findAdminsByCompanyId(companyId).stream().map(UserDTO::new).collect(Collectors.toList());
+        List<UserDTO> admins = userDao.findAdminsByCompanyId(companyId).stream().map(UserDTO::new)
+                .collect(Collectors.toList());
         return ResponseEntity.ok(admins);
     }
 
     @GetMapping("/company/{companyId}/users")
     public ResponseEntity<List<UserDTO>> getUsersByCompany(@PathVariable Long companyId) {
-        List<UserDTO> users = userDao.findUsersByCompanyId(companyId).stream().map(UserDTO::new).collect(Collectors.toList());
+        List<UserDTO> users = userDao.findUsersByCompanyId(companyId).stream().map(UserDTO::new)
+                .collect(Collectors.toList());
         return ResponseEntity.ok(users);
     }
 
@@ -315,13 +382,11 @@ public class UserController {
                     .body(Collections.singletonMap("message", "Session expired or invalid. Please login again."));
         }
     }
-    
-    
+
     @GetMapping("/count-summary/{companyId}/{userId}")
     public ResponseEntity<Map<String, Long>> getUserCountSummaryByRole(
             @PathVariable Long companyId,
-            @PathVariable Long userId
-    ) {
+            @PathVariable Long userId) {
         Optional<User> optionalUser = userRepository.findById(userId);
 
         if (optionalUser.isEmpty()) {
@@ -369,7 +434,7 @@ public class UserController {
     }
 
     // ✅ Developer Dashboard Endpoints
-    
+
     @GetMapping("/total-count")
     public ResponseEntity<Long> getTotalUsersCount() {
         try {
@@ -397,6 +462,27 @@ public class UserController {
             return ResponseEntity.ok(totalDirectors);
         } catch (Exception e) {
             return ResponseEntity.ok(0L);
+        }
+    }
+
+    // ✅ Get user role by email (for deactivated user modal)
+    @GetMapping("/role-by-email")
+    public ResponseEntity<Map<String, String>> getUserRoleByEmail(@RequestParam String email) {
+        try {
+            Optional<User> userOpt = userRepository.findByEmail(email);
+            if (userOpt.isPresent()) {
+                Map<String, String> response = new HashMap<>();
+                response.put("role", userOpt.get().getRole().name());
+                response.put("email", email);
+                response.put("status", userOpt.get().getStatus().toString());
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Collections.singletonMap("error", "User not found"));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Collections.singletonMap("error", "Failed to fetch user role"));
         }
     }
 }
