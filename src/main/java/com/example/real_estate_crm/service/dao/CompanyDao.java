@@ -4,7 +4,6 @@ import com.example.real_estate_crm.model.Company;
 import com.example.real_estate_crm.model.User;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface CompanyDao {
 

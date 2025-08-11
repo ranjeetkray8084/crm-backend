@@ -154,4 +154,43 @@ public class AuthController {
         return ResponseEntity.ok(Collections.singletonMap("message", "Logged out successfully."));
     }
 
+    // 🔍 Debug endpoint to validate token
+    @GetMapping("/validate-token")
+    public ResponseEntity<?> validateToken(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        Map<String, Object> response = new HashMap<>();
+        
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            response.put("valid", false);
+            response.put("error", "No Bearer token provided");
+            return ResponseEntity.ok(response);
+        }
+        
+        String token = authHeader.substring(7);
+        
+        try {
+            String email = jwtUtil.extractEmail(token);
+            boolean isExpired = jwtUtil.isTokenExpired(token);
+            boolean isValid = jwtUtil.isTokenValid(token);
+            
+            response.put("valid", isValid && !isExpired);
+            response.put("email", email);
+            response.put("expired", isExpired);
+            response.put("tokenValid", isValid);
+            
+            if (email != null) {
+                Optional<User> user = userRepository.findByEmail(email);
+                response.put("userExists", user.isPresent());
+                if (user.isPresent()) {
+                    response.put("userActive", user.get().getStatus());
+                }
+            }
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("valid", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.ok(response);
+        }
+    }
+
 }

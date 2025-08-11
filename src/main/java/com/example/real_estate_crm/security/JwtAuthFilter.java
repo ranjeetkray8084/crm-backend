@@ -35,6 +35,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
+        String requestURI = request.getRequestURI();
         String token = extractToken(request);
 
         if (token != null && SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -49,10 +50,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(auth);
+                } else {
+                    log.warn("❌ Token expired or email null for request: {}", requestURI);
                 }
 
             } catch (Exception e) {
-                log.warn("JWT authentication failed: {}", e.getMessage());
+                log.warn("❌ JWT authentication failed for {}: {}", requestURI, e.getMessage());
             }
         }
 

@@ -25,25 +25,24 @@ public interface NoteRepository extends JpaRepository<Note, Long> {
     void deleteByIdAndCompany_Id(@Param("noteId") Long noteId, @Param("companyId") Long companyId);
 
     @Query("""
-        SELECT DISTINCT n FROM Note n
-        WHERE n.company.id = :companyId
-        AND (
-            (n.visibility = 'ALL_USERS' AND n.userId IN :allowedUserIds)
-            OR (n.visibility = 'SPECIFIC_USERS' AND :userId IN elements(n.visibleUserIds))
-            OR (n.visibility = 'ONLY_ME' AND n.userId = :userId)
-            OR (n.visibility = 'ME_AND_ADMIN' AND (n.userId = :userId OR :isAdmin = true))
-            OR (n.visibility = 'ME_AND_DIRECTOR' AND (n.userId = :userId OR :isDirector = true))
-            OR (n.visibility = 'ALL_ADMIN' AND :isAdmin = true)
-            OR (n.visibility = 'SPECIFIC_ADMIN' AND :isAdmin = true AND :userId IN elements(n.visibleUserIds))
-        )
-    """)
+                SELECT DISTINCT n FROM Note n
+                WHERE n.company.id = :companyId
+                AND (
+                    (n.visibility = 'ALL_USERS' AND n.userId IN :allowedUserIds)
+                    OR (n.visibility = 'SPECIFIC_USERS' AND :userId IN elements(n.visibleUserIds))
+                    OR (n.visibility = 'ONLY_ME' AND n.userId = :userId)
+                    OR (n.visibility = 'ME_AND_ADMIN' AND (n.userId = :userId OR :isAdmin = true))
+                    OR (n.visibility = 'ME_AND_DIRECTOR' AND (n.userId = :userId OR :isDirector = true))
+                    OR (n.visibility = 'ALL_ADMIN' AND :isAdmin = true)
+                    OR (n.visibility = 'SPECIFIC_ADMIN' AND :isAdmin = true AND :userId IN elements(n.visibleUserIds))
+                )
+            """)
     List<Note> findNotesVisibleToUserAndCompanyWithFilteredAllUsers(
-        @Param("userId") Long userId,
-        @Param("companyId") Long companyId,
-        @Param("isAdmin") boolean isAdmin,
-        @Param("isDirector") boolean isDirector,
-        @Param("allowedUserIds") List<Long> allowedUserIds
-    );
+            @Param("userId") Long userId,
+            @Param("companyId") Long companyId,
+            @Param("isAdmin") boolean isAdmin,
+            @Param("isDirector") boolean isDirector,
+            @Param("allowedUserIds") List<Long> allowedUserIds);
 
     List<Note> findByVisibilityAndCompany_Id(Visibility visibility, Long companyId);
 
@@ -75,56 +74,57 @@ public interface NoteRepository extends JpaRepository<Note, Long> {
 
     List<Note> findByCompany_IdAndPriorityAndStatus(Long companyId, Priority priority, Status status);
 
-    List<Note> findByUserIdAndCompany_IdAndPriorityAndStatus(Long userId, Long companyId, Priority priority, Status status);
+    List<Note> findByUserIdAndCompany_IdAndPriorityAndStatus(Long userId, Long companyId, Priority priority,
+            Status status);
 
     List<Note> findByCompany_IdOrderByPriorityAsc(Long companyId);
 
     List<Note> findByCompany_IdOrderByPriorityDesc(Long companyId);
 
     List<Note> findAllByCompany_IdAndVisibilityInAndUserIdIn(
-        Long companyId,
-        List<Note.Visibility> visibilities,
-        List<Long> userIds
-    );
+            Long companyId,
+            List<Note.Visibility> visibilities,
+            List<Long> userIds);
 
-    List<Note> findNotesByCompanyIdAndVisibilityInAndUserId(Long companyId, List<Note.Visibility> visibilities, Long userId);
+    List<Note> findNotesByCompanyIdAndVisibilityInAndUserId(Long companyId, List<Note.Visibility> visibilities,
+            Long userId);
 
     // ✅ ✅ ✅ FIXED METHOD (previous one was incorrect)
     @Query("""
-        SELECT n FROM Note n 
-        WHERE n.company.id = :companyId 
-        AND n.visibility IN :visibilities 
-        AND n.userId = :userId
-    """)
+                SELECT n FROM Note n
+                WHERE n.company.id = :companyId
+                AND n.visibility IN :visibilities
+                AND n.userId = :userId
+            """)
     List<Note> findByCompanyIdAndVisibilityInAndUserIdCustom(
-        @Param("companyId") Long companyId,
-        @Param("visibilities") List<Note.Visibility> visibilities,
-        @Param("userId") Long userId
-    );
+            @Param("companyId") Long companyId,
+            @Param("visibilities") List<Note.Visibility> visibilities,
+            @Param("userId") Long userId);
 
-    // ✅ For director role (used in director-visible API)
+    // ✅ For director role (used in director-visible API) - FIXED to show ALL notes
+    // visible to director
     @Query("""
-    	    SELECT DISTINCT n FROM Note n
-    	    WHERE n.company.id = :companyId
-    	    AND (
-    	        (n.visibility = 'ALL_USERS' AND n.userId = :directorId)
-    	        OR (n.visibility = 'ME_AND_DIRECTOR' AND (n.userId = :directorId OR :isDirector = true))
-    	        OR (n.visibility = 'SPECIFIC_USERS' AND (n.userId = :directorId OR :directorId IN elements(n.visibleUserIds)))
-    	        OR (n.visibility = 'ALL_ADMIN')
-    	        OR (n.visibility = 'SPECIFIC_ADMIN' AND :directorId IN elements(n.visibleUserIds))
-    	        OR (n.visibility = 'ONLY_ME' AND n.userId = :directorId)
-    	    )
-    	""")
+                SELECT DISTINCT n FROM Note n
+                WHERE n.company.id = :companyId
+                AND (
+                    (n.visibility = 'ALL_USERS')
+                    OR (n.visibility = 'ME_AND_ADMIN' AND (n.userId = :directorId OR :isDirector = true))
+                    OR (n.visibility = 'ME_AND_DIRECTOR' AND (n.userId = :directorId OR :isDirector = true))
+                    OR (n.visibility = 'SPECIFIC_USERS' AND (n.userId = :directorId OR :directorId IN elements(n.visibleUserIds)))
+                    OR (n.visibility = 'ALL_ADMIN' AND :isDirector = true)
+                    OR (n.visibility = 'SPECIFIC_ADMIN' AND (:directorId IN elements(n.visibleUserIds) OR :isDirector = true))
+                    OR (n.visibility = 'ONLY_ME' AND n.userId = :directorId)
+                )
+            """)
 
     List<Note> findNotesVisibleToDirector(
-        @Param("companyId") Long companyId,
-        @Param("directorId") Long directorId,
-        @Param("isDirector") boolean isDirector
-    );
-    
+            @Param("companyId") Long companyId,
+            @Param("directorId") Long directorId,
+            @Param("isDirector") boolean isDirector);
+
     List<Note> findAllByCompany_IdAndVisibility(Long companyId, Visibility visibility);
-    
-    
-    List<Note> findAllByCompany_IdAndVisibilityAndVisibleUserIdsContaining(Long companyId, Visibility visibility, Long adminId);
+
+    List<Note> findAllByCompany_IdAndVisibilityAndVisibleUserIdsContaining(Long companyId, Visibility visibility,
+            Long adminId);
 
 }

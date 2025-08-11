@@ -4,7 +4,6 @@ import com.example.real_estate_crm.model.Company;
 import com.example.real_estate_crm.model.User;
 import com.example.real_estate_crm.security.SecurityUtil;
 import com.example.real_estate_crm.service.dao.CompanyDao;
-import com.example.real_estate_crm.service.dao.UserDao;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,20 +15,25 @@ import java.util.List;
 public class CompanyController {
 
     private final CompanyDao companyDao;
-    private final UserDao userDao;
 
     @Autowired
-    public CompanyController(CompanyDao companyDao, UserDao userDao) {
+    public CompanyController(CompanyDao companyDao) {
         this.companyDao = companyDao;
-        this.userDao = userDao;
     }
 
     // ✅ 1. Add New Company (Only Developer)
     @PostMapping("/add")
     public ResponseEntity<?> addCompany(@RequestBody Company company) {
- 
+        // Get current user (should be developer)
+        User currentUser = SecurityUtil.getCurrentUser();
+        System.out.println("🔍 Creating company - Current user: " + (currentUser != null ? currentUser.getEmail() + " (" + currentUser.getRole() + ")" : "null"));
+        
+        if (currentUser == null || currentUser.getRole() != User.Role.DEVELOPER) {
+            return ResponseEntity.status(403).body("Only developers can create companies");
+        }
 
         // Set developer reference and default status
+        company.setDeveloper(currentUser);
         company.setStatus("active");
 
         // Optional: Set default max limits if not provided
@@ -44,14 +48,24 @@ public class CompanyController {
             return ResponseEntity.badRequest().body("maxAdmins must be >= 0");
         }
 
+        System.out.println("💾 Saving company: " + company.getName());
         Company savedCompany = companyDao.save(company);
+        System.out.println("✅ Company saved with ID: " + savedCompany.getId());
         return ResponseEntity.ok(savedCompany);
     }
 
     // ✅ 2. Get All Companies (Admin Purpose)
     @GetMapping("/all")
-    public ResponseEntity<List<Company>> getAllCompanies() {
+    public ResponseEntity<?> getAllCompanies() {
+        User currentUser = SecurityUtil.getCurrentUser();
+        System.out.println("🔍 Current user: " + (currentUser != null ? currentUser.getEmail() + " (" + currentUser.getRole() + ")" : "null"));
+        
+        if (currentUser == null || currentUser.getRole() != User.Role.DEVELOPER) {
+            return ResponseEntity.status(403).body("Only developers can view all companies");
+        }
+        
         List<Company> companies = companyDao.findAll();
+        System.out.println("📊 Found " + companies.size() + " companies");
         return ResponseEntity.ok(companies);
     }
 

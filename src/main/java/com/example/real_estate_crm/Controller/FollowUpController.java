@@ -22,16 +22,16 @@ public class FollowUpController {
 
     @Autowired
     private FollowUpDao followUpDao;
-    
+
     @Autowired
-    private FollowUpRepository followUpRepository; 
-    
+    private FollowUpRepository followUpRepository;
+
     @Autowired
     private LeadRepository leadRepository;
-    
+
     @Autowired
     private UserRepository userRepository;
-    
+
     @Autowired
     private NotificationService notificationService;
 
@@ -44,7 +44,7 @@ public class FollowUpController {
     // ✅ Get follow-up by ID
     @GetMapping("/{id}")
     public ResponseEntity<FollowUp> getFollowUpById(@PathVariable Long companyId,
-                                                    @PathVariable Long id) {
+            @PathVariable Long id) {
         FollowUp followUp = followUpDao.findById(companyId, id);
         return followUp != null ? ResponseEntity.ok(followUp) : ResponseEntity.notFound().build();
     }
@@ -53,9 +53,9 @@ public class FollowUpController {
     @PostMapping()
     public ResponseEntity<?> createFollowUp(@RequestBody FollowUpRequest request) {
         Lead lead = leadRepository.findById(request.getLeadId())
-            .orElseThrow(() -> new RuntimeException("Lead not found"));
+                .orElseThrow(() -> new RuntimeException("Lead not found"));
         User user = userRepository.findById(request.getUserId())
-            .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         FollowUp followUp = new FollowUp();
         followUp.setNote(request.getNote());
@@ -65,30 +65,50 @@ public class FollowUpController {
         followUp.setCompany(lead.getCompany());
 
         FollowUp saved = followUpRepository.save(followUp);
-        
-        // 🔔 Send notification for follow-up creation - DISABLED
-        // try {
-        //     notificationService.sendFollowUpCreatedNotification(saved, user);
-        // } catch (Exception e) {
-        //     // Log error but don't fail the request
-        //     System.err.println("Failed to send follow-up notification: " + e.getMessage());
-        // }
-        
+
+        // 🔔 Send notification only if follow-up is for today
+        try {
+            LocalDateTime today = LocalDateTime.now().toLocalDate().atStartOfDay();
+            LocalDateTime tomorrow = today.plusDays(1);
+
+            // Check if follow-up date is today
+            if (saved.getFollowupDate().isAfter(today.minusSeconds(1)) &&
+                    saved.getFollowupDate().isBefore(tomorrow)) {
+
+                System.out.println("📧 Follow-up is for today, sending immediate notification...");
+                String message = "⏰ Follow-up scheduled for today: \"" + saved.getLead().getName() +
+                        "\" at " + saved.getFollowupDate().toLocalTime().toString().substring(0, 5);
+
+                notificationService.sendNotification(user.getUserId(), saved.getCompany(), message);
+                System.out.println("✅ Today's follow-up notification sent successfully");
+            } else {
+                System.out.println("📅 Follow-up is for " + saved.getFollowupDate().toLocalDate() +
+                        ", no immediate notification sent");
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send follow-up notification: " + e.getMessage());
+        }
+
         return ResponseEntity.ok(saved);
     }
 
     // ✅ Update follow-up
     @PutMapping
     public ResponseEntity<FollowUp> updateFollowUp(@PathVariable Long companyId,
-                                                   @RequestBody FollowUp followUp) {
+            @RequestBody FollowUp followUp) {
         FollowUp updated = followUpDao.updateFollowUp(companyId, followUp);
+
+        // 🔔 No notification for follow-up updates
+        System.out.println("📝 Follow-up updated for lead: " + updated.getLead().getName() +
+                " (No notification sent)");
+
         return ResponseEntity.ok(updated);
     }
 
     // ✅ Delete follow-up
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteFollowUp(@PathVariable Long companyId,
-                                               @PathVariable Long id) {
+            @PathVariable Long id) {
         followUpDao.deleteById(companyId, id);
         return ResponseEntity.noContent().build();
     }

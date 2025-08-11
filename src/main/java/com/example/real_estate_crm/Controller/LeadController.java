@@ -80,22 +80,29 @@ public class LeadController {
 
     @PostMapping
     public ResponseEntity<?> addLead(@PathVariable Long companyId, @RequestBody Lead lead) {
+        System.out.println("🔄 Creating lead for company: " + companyId);
+        System.out.println("📝 Lead data: " + lead.getName() + " - " + lead.getPhone());
+        
         // ✅ Step 1: Validate createdBy.userId
         if (lead.getCreatedBy() == null || lead.getCreatedBy().getUserId() == null) {
+            System.out.println("❌ Missing createdBy.userId");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("❌ 'createdBy.userId' is required to create a lead.");
         }
 
         Long userId = lead.getCreatedBy().getUserId();
+        System.out.println("👤 Creating lead for user: " + userId);
 
         // ✅ Step 2: Fetch user from DB
         Optional<User> optionalUser = userService.findById(userId);
         if (optionalUser.isEmpty()) {
+            System.out.println("❌ User not found: " + userId);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body("❌ Invalid user. Please login again.");
         }
 
         User creator = optionalUser.get();
+        System.out.println("✅ User found: " + creator.getName() + " (" + creator.getRole() + ")");
 
         // ✅ Step 3: Attach user and company
         lead.setCreatedBy(creator);
@@ -105,33 +112,45 @@ public class LeadController {
 
         try {
             // ✅ Step 4: Save lead
+            System.out.println("💾 Saving lead to database...");
             Lead createdLead = leadService.addLead(companyId, lead);
+            System.out.println("✅ Lead saved successfully with ID: " + createdLead.getLeadId());
 
             // ✅ Step 5: Notification Logic
-            String message = "📢 A new lead \"" + createdLead.getName() + "\" was created by " + creator.getName();
+            try {
+                String message = "📢 A new lead \"" + createdLead.getName() + "\" was created by " + creator.getName();
 
-            if (creator.getRole() == User.Role.USER) {
-                // Notify admin if assigned
-                if (creator.getAdmin() != null) {
-                    notificationService.sendNotification(creator.getAdmin().getUserId(), company, message);
-                }
-                // Notify director
-                User director = userService.findDirectorByCompany(company);
-                if (director != null) {
-                    notificationService.sendNotification(director.getUserId(), company, message);
-                }
+                if (creator.getRole() == User.Role.USER) {
+                    // Notify admin if assigned
+                    if (creator.getAdmin() != null) {
+                        notificationService.sendNotification(creator.getAdmin().getUserId(), company, message);
+                        System.out.println("📧 Notification sent to admin: " + creator.getAdmin().getName());
+                    }
+                    // Notify director
+                    User director = userService.findDirectorByCompany(company);
+                    if (director != null) {
+                        notificationService.sendNotification(director.getUserId(), company, message);
+                        System.out.println("📧 Notification sent to director: " + director.getName());
+                    }
 
-            } else if (creator.getRole() == User.Role.ADMIN) {
-                // Notify director only
-                User director = userService.findDirectorByCompany(company);
-                if (director != null) {
-                    notificationService.sendNotification(director.getUserId(), company, message);
+                } else if (creator.getRole() == User.Role.ADMIN) {
+                    // Notify director only
+                    User director = userService.findDirectorByCompany(company);
+                    if (director != null) {
+                        notificationService.sendNotification(director.getUserId(), company, message);
+                        System.out.println("📧 Notification sent to director: " + director.getName());
+                    }
                 }
+            } catch (Exception notificationEx) {
+                System.out.println("⚠️ Notification failed but lead created: " + notificationEx.getMessage());
+                // Don't fail the entire operation if notification fails
             }
 
+            System.out.println("🎉 Lead creation completed successfully");
             return ResponseEntity.status(HttpStatus.CREATED).body(createdLead);
 
         } catch (Exception ex) {
+            System.out.println("❌ Error creating lead: " + ex.getMessage());
             ex.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("❌ Failed to create lead: " + ex.getMessage());

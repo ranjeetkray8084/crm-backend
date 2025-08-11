@@ -86,10 +86,15 @@ public class NotificationController {
         User user = getUser(userId);
 
         if (company == null || user == null) {
+            System.out.println("❌ Company or User not found - Company: " + (company != null ? company.getName() : "null") + ", User: " + (user != null ? user.getName() : "null"));
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
 
+        System.out.println("🔍 Fetching notifications for user: " + user.getName() + " (ID: " + userId + ", Role: " + user.getRole() + ") in company: " + company.getName());
+        
         List<Notification> notifications = notificationService.getNotificationsByUserAndCompany(user, company);
+        System.out.println("📧 Found " + notifications.size() + " notifications for user: " + user.getName());
+        
         return ResponseEntity.ok(notifications);
     }
 

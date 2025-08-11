@@ -59,39 +59,79 @@ public class NoteController {
         String username = userService.findUsernameByUserId(note.getUserId()).orElse("Unknown User");
 
         switch (note.getVisibility()) {
-            case ME_AND_ADMIN -> userRepository.findByRole(User.Role.ADMIN)
-                    .forEach(admin -> notificationService.sendNotification(
-                            admin.getUserId(), companyOpt.get(), username + " created a new note for you."));
-            case ALL_USERS -> userRepository.findByRole(User.Role.USER)
-                    .forEach(user -> notificationService.sendNotification(
-                            user.getUserId(), companyOpt.get(), username + " shared a new note for you."));
+            case ONLY_ME -> {
+                // No notifications needed for private notes
+            }
+            case ME_AND_ADMIN -> {
+                // Send notification to all admins in the company (excluding note creator)
+                userRepository.findByCompanyIdAndRole(companyId, User.Role.ADMIN)
+                        .stream()
+                        .filter(admin -> !admin.getUserId().equals(note.getUserId()))
+                        .forEach(admin -> notificationService.sendNotification(
+                                admin.getUserId(), companyOpt.get(), username + " created a new note for you."));
+            }
+            case ALL_USERS -> {
+                // Send notification to all users in the company (excluding note creator)
+                userRepository.findByCompanyIdAndRole(companyId, User.Role.USER)
+                        .stream()
+                        .filter(user -> !user.getUserId().equals(note.getUserId()))
+                        .forEach(user -> notificationService.sendNotification(
+                                user.getUserId(), companyOpt.get(), username + " shared a new note for you."));
+            }
             case SPECIFIC_USERS -> {
+                // Send notification to specific selected users (excluding note creator)
                 if (note.getVisibleUserIds() != null) {
                     for (Long userId : note.getVisibleUserIds()) {
-                        userRepository.findById(userId).ifPresent(user -> {
-                            if (user.getRole() == User.Role.ADMIN || user.getRole() == User.Role.USER || user.getRole() == User.Role.DIRECTOR) {
-                                notificationService.sendNotification(
-                                        user.getUserId(), companyOpt.get(), username + " shared a new note with you.");
-                            }
-                        });
+                        // Don't send notification to the note creator
+                        if (!userId.equals(note.getUserId())) {
+                            userRepository.findById(userId).ifPresent(user -> {
+                                // Only notify if user belongs to the same company
+                                if (user.getCompany() != null && user.getCompany().getId().equals(companyId)) {
+                                    notificationService.sendNotification(
+                                            user.getUserId(), companyOpt.get(), username + " shared a new note with you.");
+                                }
+                            });
+                        }
                     }
                 }
             }
-            case ME_AND_DIRECTOR -> userRepository.findByRole(User.Role.DIRECTOR)
-                    .forEach(director -> notificationService.sendNotification(
-                            director.getUserId(), companyOpt.get(), username + " shared a new note with director."));
-            case ALL_ADMIN -> userRepository.findByRole(User.Role.ADMIN)
-                    .forEach(admin -> notificationService.sendNotification(
-                            admin.getUserId(), companyOpt.get(), username + " shared a note for all admins."));
+            case ME_AND_DIRECTOR -> {
+                // Send notification to all directors in the company (excluding note creator)
+                List<User> directors = userRepository.findByCompanyIdAndRole(companyId, User.Role.DIRECTOR);
+                System.out.println("🔍 Found " + directors.size() + " directors in company " + companyId);
+                
+                directors.stream()
+                        .filter(director -> !director.getUserId().equals(note.getUserId()))
+                        .forEach(director -> {
+                            System.out.println("📧 Sending notification to director: " + director.getName() + " (ID: " + director.getUserId() + ")");
+                            notificationService.sendNotification(
+                                    director.getUserId(), companyOpt.get(), username + " shared a new note with you.");
+                        });
+            }
+            case ALL_ADMIN -> {
+                // Send notification to all admins in the company (excluding note creator)
+                userRepository.findByCompanyIdAndRole(companyId, User.Role.ADMIN)
+                        .stream()
+                        .filter(admin -> !admin.getUserId().equals(note.getUserId()))
+                        .forEach(admin -> notificationService.sendNotification(
+                                admin.getUserId(), companyOpt.get(), username + " shared a note for all admins."));
+            }
             case SPECIFIC_ADMIN -> {
+                // Send notification to specific selected admins (excluding note creator)
                 if (note.getVisibleUserIds() != null) {
                     for (Long userId : note.getVisibleUserIds()) {
-                        userRepository.findById(userId).ifPresent(user -> {
-                            if (user.getRole() == User.Role.ADMIN) {
-                                notificationService.sendNotification(
-                                        user.getUserId(), companyOpt.get(), username + " shared a note with specific admin.");
-                            }
-                        });
+                        // Don't send notification to the note creator
+                        if (!userId.equals(note.getUserId())) {
+                            userRepository.findById(userId).ifPresent(user -> {
+                                // Only notify if user is admin and belongs to the same company
+                                if (user.getRole() == User.Role.ADMIN && 
+                                    user.getCompany() != null && 
+                                    user.getCompany().getId().equals(companyId)) {
+                                    notificationService.sendNotification(
+                                            user.getUserId(), companyOpt.get(), username + " shared a note with you.");
+                                }
+                            });
+                        }
                     }
                 }
             }
