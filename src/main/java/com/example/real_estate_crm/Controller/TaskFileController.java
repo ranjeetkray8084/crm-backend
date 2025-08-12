@@ -261,7 +261,6 @@ public class TaskFileController {
 
             return ResponseEntity.ok("Cell updated successfully.");
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("❌ Failed to update cell: " + e.getMessage());
         } finally {
@@ -347,7 +346,6 @@ public class TaskFileController {
             return ResponseEntity.ok("✅ Column " + colIndex + " deleted successfully.");
 
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("❌ Failed to delete column: " + e.getMessage());
         } finally {
@@ -355,7 +353,7 @@ public class TaskFileController {
                 try {
                     workbook.close(); // Ensure workbook is closed
                 } catch (IOException e) {
-                    e.printStackTrace(); // Log workbook close error
+                    // Log workbook close error
                 }
             }
         }
@@ -477,7 +475,6 @@ public class TaskFileController {
             taskrepo.delete(task); // Delete the task record from the database
             return ResponseEntity.ok("Task deleted successfully.");
         } catch (IOException e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to delete task file: " + e.getMessage());
         }

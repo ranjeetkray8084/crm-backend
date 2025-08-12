@@ -98,12 +98,10 @@ public class NoteController {
             case ME_AND_DIRECTOR -> {
                 // Send notification to all directors in the company (excluding note creator)
                 List<User> directors = userRepository.findByCompanyIdAndRole(companyId, User.Role.DIRECTOR);
-                System.out.println("🔍 Found " + directors.size() + " directors in company " + companyId);
                 
                 directors.stream()
                         .filter(director -> !director.getUserId().equals(note.getUserId()))
                         .forEach(director -> {
-                            System.out.println("📧 Sending notification to director: " + director.getName() + " (ID: " + director.getUserId() + ")");
                             notificationService.sendNotification(
                                     director.getUserId(), companyOpt.get(), username + " shared a new note with you.");
                         });

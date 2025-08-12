@@ -26,7 +26,8 @@ public class Lead {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
-    @JsonIgnoreProperties({"email", "password", "role", "phone", "createdAt", "updatedAt", "company", "notes", "leads"})
+    @JsonIgnoreProperties({ "email", "password", "role", "phone", "createdAt", "updatedAt", "company", "notes",
+            "leads" })
     private User createdBy;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -45,9 +46,9 @@ public class Lead {
     @Column(nullable = false)
     private String phone;
 
-    @NotBlank(message = "Source is required")
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String source;
+    private Source source;
 
     @Column(name = "reference_name")
     private String referenceName;
@@ -62,7 +63,7 @@ public class Lead {
 
     @ManyToOne
     @JoinColumn(name = "assigned_to") // ya "assigned_user_id" jo tumhara DB column hai
-    @JsonBackReference("user-leads")  // ✅ match with User.java
+    @JsonBackReference("user-leads") // ✅ match with User.java
     private User assignedTo;
 
     @Column(nullable = false, updatable = false)
@@ -70,18 +71,15 @@ public class Lead {
 
     @Column(nullable = false)
     private LocalDateTime updatedAt;
-    
+
     @Column(nullable = true)
     private String location;
-
 
     @Version
     private Long version;
 
     @Column(precision = 15, scale = 2, nullable = true)
     private BigDecimal budget;
-
-
 
     @Column(columnDefinition = "TEXT")
     private String requirement;
@@ -121,8 +119,10 @@ public class Lead {
     }
 
     public void assignTo(User user) {
-        if (user == null) throw new IllegalArgumentException("User cannot be null");
-        if (!isAssignable()) throw new IllegalStateException("Lead must be NEW or UNASSIGNED to be assigned");
+        if (user == null)
+            throw new IllegalArgumentException("User cannot be null");
+        if (!isAssignable())
+            throw new IllegalStateException("Lead must be NEW or UNASSIGNED to be assigned");
         this.assignedTo = user;
         this.action = Action.ASSIGNED;
     }
@@ -145,7 +145,7 @@ public class Lead {
     }
 
     public enum Source {
-        INSTAGRAM, FACEBOOK, YOUTUBE, REFERENCE
+        INSTAGRAM, FACEBOOK, YOUTUBE, REFERENCE, NINETY_NINE_ACRES, MAGIC_BRICKS
     }
 
     public enum Action {

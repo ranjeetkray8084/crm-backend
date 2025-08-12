@@ -79,7 +79,11 @@ public class UserDaoImpl implements UserDao {
     
     @Override
     public User findDirectorByCompany(Company company) {
-        return userRepository.findByCompanyAndRole(company, User.Role.DIRECTOR);
+        try {
+            return userRepository.findByCompanyAndRole(company, User.Role.DIRECTOR);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @Override
@@ -123,7 +127,7 @@ public class UserDaoImpl implements UserDao {
 
     @Override
     public void logout(Long userId) {
-        System.out.println("User logged out: " + userId);
+        // User logout logic if needed
     }
 
     @Override

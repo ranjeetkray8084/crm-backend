@@ -9,6 +9,7 @@ import com.example.real_estate_crm.model.User;
 import com.example.real_estate_crm.repository.PropertyRemarkRepository;
 import com.example.real_estate_crm.repository.PropertyRepository;
 import com.example.real_estate_crm.repository.UserRepository;
+import com.example.real_estate_crm.repository.CompanyRepository;
 import com.example.real_estate_crm.model.Property.Status;
 import com.example.real_estate_crm.service.NotificationService;
 import com.example.real_estate_crm.service.dao.PropertyDao;
@@ -53,42 +54,40 @@ public class PropertyController {
     @Autowired
     private UserRepository userRepository;
     
+    @Autowired
+    private CompanyRepository companyRepository;
+    
     @PostMapping
     public ResponseEntity<?> createProperty(@PathVariable Long companyId, @RequestBody Property property) {
-        System.out.println("🔄 Creating property for company: " + companyId);
-        System.out.println("🏠 Property data: " + property.getPropertyName() + " - " + property.getType());
-        
         if (property.getCreatedBy() == null || property.getCreatedBy().getUserId() == null) {
-            System.out.println("❌ Missing createdBy.userId");
             return ResponseEntity
                     .status(HttpStatus.BAD_REQUEST)
                     .body("❌ Please login before creating a property.");
         }
 
         Long userId = property.getCreatedBy().getUserId();
-        System.out.println("👤 Creating property for user: " + userId);
         
         Optional<User> optionalUser = userService.findById(userId);
         if (optionalUser.isEmpty()) {
-            System.out.println("❌ User not found: " + userId);
             return ResponseEntity
                     .status(HttpStatus.UNAUTHORIZED)
                     .body("❌ Invalid user. Please login again.");
         }
 
         User creator = optionalUser.get();
-        System.out.println("✅ User found: " + creator.getName() + " (" + creator.getRole() + ")");
+        
+        // Fetch company from DB
+        Company company = companyRepository.findById(companyId).orElse(null);
+        if (company == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("❌ Company not found.");
+        }
         
         property.setCreatedBy(creator);
-
-        Company company = new Company();
-        company.setId(companyId);
         property.setCompany(company);
 
         try {
-            System.out.println("💾 Saving property to database...");
             Property created = propertyService.addProperty(property);
-            System.out.println("✅ Property saved successfully with ID: " + created.getPropertyId());
 
             // Notification Logic
             try {
@@ -98,14 +97,12 @@ public class PropertyController {
                     // Notify creator's admin
                     if (creator.getAdmin() != null) {
                         notificationService.sendNotification(creator.getAdmin().getUserId(), company, message);
-                        System.out.println("📧 Notification sent to admin: " + creator.getAdmin().getName());
                     }
 
                     // Notify director of the company
                     User director = userService.findDirectorByCompany(company);
                     if (director != null) {
                         notificationService.sendNotification(director.getUserId(), company, message);
-                        System.out.println("📧 Notification sent to director: " + director.getName());
                     }
 
                 } else if (creator.getRole() == User.Role.ADMIN) {
@@ -113,20 +110,15 @@ public class PropertyController {
                     User director = userService.findDirectorByCompany(company);
                     if (director != null) {
                         notificationService.sendNotification(director.getUserId(), company, message);
-                        System.out.println("📧 Notification sent to director: " + director.getName());
                     }
                 }
             } catch (Exception notificationEx) {
-                System.out.println("⚠️ Notification failed but property created: " + notificationEx.getMessage());
                 // Don't fail the entire operation if notification fails
             }
 
-            System.out.println("🎉 Property creation completed successfully");
             return ResponseEntity.status(HttpStatus.CREATED).body(created);
             
         } catch (Exception ex) {
-            System.out.println("❌ Error creating property: " + ex.getMessage());
-            ex.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("❌ Failed to create property: " + ex.getMessage());
         }
