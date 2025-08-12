@@ -75,18 +75,13 @@ public class FollowUpController {
             if (saved.getFollowupDate().isAfter(today.minusSeconds(1)) &&
                     saved.getFollowupDate().isBefore(tomorrow)) {
 
-                System.out.println("📧 Follow-up is for today, sending immediate notification...");
                 String message = "⏰ Follow-up scheduled for today: \"" + saved.getLead().getName() +
                         "\" at " + saved.getFollowupDate().toLocalTime().toString().substring(0, 5);
 
                 notificationService.sendNotification(user.getUserId(), saved.getCompany(), message);
-                System.out.println("✅ Today's follow-up notification sent successfully");
-            } else {
-                System.out.println("📅 Follow-up is for " + saved.getFollowupDate().toLocalDate() +
-                        ", no immediate notification sent");
             }
         } catch (Exception e) {
-            System.err.println("❌ Failed to send follow-up notification: " + e.getMessage());
+            // Continue processing
         }
 
         return ResponseEntity.ok(saved);
@@ -98,9 +93,7 @@ public class FollowUpController {
             @RequestBody FollowUp followUp) {
         FollowUp updated = followUpDao.updateFollowUp(companyId, followUp);
 
-        // 🔔 No notification for follow-up updates
-        System.out.println("📝 Follow-up updated for lead: " + updated.getLead().getName() +
-                " (No notification sent)");
+        // No notification for follow-up updates
 
         return ResponseEntity.ok(updated);
     }

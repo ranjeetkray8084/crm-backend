@@ -93,12 +93,9 @@ public class UserController {
             if (user.isPresent()) {
                 return ResponseEntity.ok(new UserDTO(user.get()));
             } else {
-                System.out.println("❌ User not found with ID: " + id);
                 return ResponseEntity.notFound().build();
             }
         } catch (Exception e) {
-            System.out.println("❌ Error getting user by ID " + id + ": " + e.getMessage());
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -106,14 +103,12 @@ public class UserController {
     @PostMapping
     public ResponseEntity<?> createUser(@RequestBody User user) {
         try {
-            // Step 1: Null check safely
+            // Null check safely
             if (user.getCompany() == null) {
-                System.out.println("❌ Company object is null");
                 return ResponseEntity.badRequest().body("Company is required");
             }
 
             if (user.getCompany().getId() == null) {
-                System.out.println("❌ Company ID is null");
                 return ResponseEntity.badRequest().body("Company ID is required");
             }
 
@@ -147,24 +142,18 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.CREATED).body(new UserDTO(savedUser));
 
         } catch (Exception e) {
-            e.printStackTrace(); // For debug in logs
             return ResponseEntity.badRequest().body("❌ Error creating user: " + e.getMessage());
         }
     }
 
     @PutMapping("/update-profile/{id}")
     public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody User user, HttpServletResponse response) {
-        System.out.println("🔄 Updating user profile for ID: " + id);
-        System.out.println("📧 New email: " + user.getEmail());
-
         Optional<User> optionalUser = userDao.findById(id);
         if (optionalUser.isEmpty()) {
-            System.out.println("❌ User not found with ID: " + id);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
         }
 
         User existingUser = optionalUser.get();
-        System.out.println("📧 Current email: " + existingUser.getEmail());
 
         boolean emailChanged = !existingUser.getEmail().equals(user.getEmail());
 

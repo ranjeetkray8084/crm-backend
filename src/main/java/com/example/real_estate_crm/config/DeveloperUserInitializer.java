@@ -30,22 +30,18 @@ public class DeveloperUserInitializer implements CommandLineRunner {
         // ✅ Check if developer user already exists by email
         Optional<User> existingUser = userRepository.findByEmail(email);
 
-        if (existingUser.isPresent()) {
-            System.out.println("✅ Developer user with email " + email + " already exists. Skipping creation.");
-        } else {
-            // ✅ Create developer user only if not present
+        if (existingUser.isEmpty()) {
+            // Create developer user only if not present
             User developer = new User();
             developer.setName(name);
             developer.setEmail(email);
-            developer.setPassword(passwordEncoder.encode(password)); // Secure password
+            developer.setPassword(passwordEncoder.encode(password));
             developer.setPhone(phone);
             developer.setRole(Role.DEVELOPER);
             developer.setStatus(true);
             developer.setCreatedAt(LocalDateTime.now());
 
             userRepository.save(developer);
-
-            System.out.println("✅ Developer user created successfully: " + developer.getEmail());
         }
     }
 }

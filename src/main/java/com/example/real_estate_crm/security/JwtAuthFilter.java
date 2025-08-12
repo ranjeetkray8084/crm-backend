@@ -51,11 +51,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 } else {
-                    log.warn("❌ Token expired or email null for request: {}", requestURI);
+                    // Token expired or email null
                 }
 
             } catch (Exception e) {
-                log.warn("❌ JWT authentication failed for {}: {}", requestURI, e.getMessage());
+                // JWT authentication failed
             }
         }
 

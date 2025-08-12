@@ -7,6 +7,7 @@ import com.example.real_estate_crm.model.User;
 import com.example.real_estate_crm.repository.LeadRemarkRepository;
 import com.example.real_estate_crm.repository.LeadRepository;
 import com.example.real_estate_crm.repository.UserRepository;
+import com.example.real_estate_crm.repository.CompanyRepository;
 import com.example.real_estate_crm.service.NotificationService;
 import com.example.real_estate_crm.service.dao.LeadDao;
 import com.example.real_estate_crm.service.dao.UserDao;
@@ -41,6 +42,7 @@ public class LeadController {
     private final LeadRepository leadRepository;
     private final LeadRemarkRepository leadRemarkRepository;
     private final UserRepository userRepository;
+    private final CompanyRepository companyRepository;
 
     @Autowired
     public LeadController(
@@ -49,16 +51,17 @@ public class LeadController {
             NotificationService notificationService,
             LeadRepository leadRepository,
             LeadRemarkRepository leadRemarkRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            CompanyRepository companyRepository) {
         this.leadService = leadService;
         this.userService = userService;
         this.notificationService = notificationService;
         this.leadRepository = leadRepository;
         this.leadRemarkRepository = leadRemarkRepository;
         this.userRepository = userRepository;
+        this.companyRepository = companyRepository;
     }
-    
-    
+
     @GetMapping
     public ResponseEntity<Page<Lead>> getAllLeads(
             @PathVariable Long companyId,
@@ -71,7 +74,6 @@ public class LeadController {
         return ResponseEntity.ok(leadsPage);
     }
 
-
     @GetMapping("/{id}")
     public ResponseEntity<Lead> getLead(@PathVariable Long companyId, @PathVariable Long id) {
         Lead lead = leadService.getById(companyId, id);
@@ -80,43 +82,39 @@ public class LeadController {
 
     @PostMapping
     public ResponseEntity<?> addLead(@PathVariable Long companyId, @RequestBody Lead lead) {
-        System.out.println("🔄 Creating lead for company: " + companyId);
-        System.out.println("📝 Lead data: " + lead.getName() + " - " + lead.getPhone());
-        
-        // ✅ Step 1: Validate createdBy.userId
+        // Validate createdBy.userId
         if (lead.getCreatedBy() == null || lead.getCreatedBy().getUserId() == null) {
-            System.out.println("❌ Missing createdBy.userId");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("❌ 'createdBy.userId' is required to create a lead.");
         }
 
         Long userId = lead.getCreatedBy().getUserId();
-        System.out.println("👤 Creating lead for user: " + userId);
 
-        // ✅ Step 2: Fetch user from DB
+        // Fetch user from DB
         Optional<User> optionalUser = userService.findById(userId);
         if (optionalUser.isEmpty()) {
-            System.out.println("❌ User not found: " + userId);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body("❌ Invalid user. Please login again.");
         }
 
         User creator = optionalUser.get();
-        System.out.println("✅ User found: " + creator.getName() + " (" + creator.getRole() + ")");
 
-        // ✅ Step 3: Attach user and company
+        // Fetch company from DB
+        Company company = companyRepository.findById(companyId).orElse(null);
+        if (company == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("❌ Company not found.");
+        }
+
+        // Attach user and company
         lead.setCreatedBy(creator);
-        Company company = new Company();
-        company.setId(companyId);
         lead.setCompany(company);
 
         try {
-            // ✅ Step 4: Save lead
-            System.out.println("💾 Saving lead to database...");
+            // Save lead
             Lead createdLead = leadService.addLead(companyId, lead);
-            System.out.println("✅ Lead saved successfully with ID: " + createdLead.getLeadId());
 
-            // ✅ Step 5: Notification Logic
+            // Notification Logic
             try {
                 String message = "📢 A new lead \"" + createdLead.getName() + "\" was created by " + creator.getName();
 
@@ -124,13 +122,12 @@ public class LeadController {
                     // Notify admin if assigned
                     if (creator.getAdmin() != null) {
                         notificationService.sendNotification(creator.getAdmin().getUserId(), company, message);
-                        System.out.println("📧 Notification sent to admin: " + creator.getAdmin().getName());
                     }
+
                     // Notify director
                     User director = userService.findDirectorByCompany(company);
                     if (director != null) {
                         notificationService.sendNotification(director.getUserId(), company, message);
-                        System.out.println("📧 Notification sent to director: " + director.getName());
                     }
 
                 } else if (creator.getRole() == User.Role.ADMIN) {
@@ -138,25 +135,19 @@ public class LeadController {
                     User director = userService.findDirectorByCompany(company);
                     if (director != null) {
                         notificationService.sendNotification(director.getUserId(), company, message);
-                        System.out.println("📧 Notification sent to director: " + director.getName());
                     }
                 }
             } catch (Exception notificationEx) {
-                System.out.println("⚠️ Notification failed but lead created: " + notificationEx.getMessage());
                 // Don't fail the entire operation if notification fails
             }
 
-            System.out.println("🎉 Lead creation completed successfully");
             return ResponseEntity.status(HttpStatus.CREATED).body(createdLead);
 
         } catch (Exception ex) {
-            System.out.println("❌ Error creating lead: " + ex.getMessage());
-            ex.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("❌ Failed to create lead: " + ex.getMessage());
         }
     }
-
 
     @PutMapping("/{leadId}")
     public ResponseEntity<Lead> updateLeadById(
@@ -165,32 +156,42 @@ public class LeadController {
             @RequestBody Lead updatedLead) {
 
         Lead existingLead = leadService.getById(companyId, leadId);
-        if (existingLead == null) return ResponseEntity.notFound().build();
+        if (existingLead == null)
+            return ResponseEntity.notFound().build();
 
         // Update fields if not null
-        if (updatedLead.getName() != null) existingLead.setName(updatedLead.getName());
+        if (updatedLead.getName() != null)
+            existingLead.setName(updatedLead.getName());
         if (updatedLead.getEmail() != null) {
             String email = updatedLead.getEmail().trim();
             existingLead.setEmail(email.isEmpty() ? null : email);
         }
-        if (updatedLead.getPhone() != null) existingLead.setPhone(updatedLead.getPhone());
-        if (updatedLead.getSource() != null) existingLead.setSource(updatedLead.getSource());
-        if (updatedLead.getReferenceName() != null) existingLead.setReferenceName(updatedLead.getReferenceName());
-        if (updatedLead.getStatus() != null) existingLead.setStatus(updatedLead.getStatus());
-        if (updatedLead.getAction() != null) existingLead.setAction(updatedLead.getAction());
-        if (updatedLead.getUpdatedAt() != null) existingLead.setUpdatedAt(updatedLead.getUpdatedAt());
-        
+        if (updatedLead.getPhone() != null)
+            existingLead.setPhone(updatedLead.getPhone());
+        if (updatedLead.getSource() != null)
+            existingLead.setSource(updatedLead.getSource());
+        if (updatedLead.getReferenceName() != null)
+            existingLead.setReferenceName(updatedLead.getReferenceName());
+        if (updatedLead.getStatus() != null)
+            existingLead.setStatus(updatedLead.getStatus());
+        if (updatedLead.getAction() != null)
+            existingLead.setAction(updatedLead.getAction());
+        if (updatedLead.getUpdatedAt() != null)
+            existingLead.setUpdatedAt(updatedLead.getUpdatedAt());
+
         // ✅ Missing fields added
-        if (updatedLead.getBudget() != null) existingLead.setBudget(updatedLead.getBudget());
-        if (updatedLead.getRequirement() != null) existingLead.setRequirement(updatedLead.getRequirement());
-        if(updatedLead.getLocation() != null) existingLead.setLocation(updatedLead.getLocation());
+        if (updatedLead.getBudget() != null)
+            existingLead.setBudget(updatedLead.getBudget());
+        if (updatedLead.getRequirement() != null)
+            existingLead.setRequirement(updatedLead.getRequirement());
+        if (updatedLead.getLocation() != null)
+            existingLead.setLocation(updatedLead.getLocation());
 
         // Set company
         existingLead.setCompany(new Company(companyId));
 
         return ResponseEntity.ok(leadService.updateLead(companyId, existingLead));
     }
-
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteLead(@PathVariable Long companyId, @PathVariable Long id) {
@@ -218,7 +219,7 @@ public class LeadController {
         return ResponseEntity.ok(leadService.getLeadsBySource(companyId, source));
     }
 
- // Controller Method
+    // Controller Method
     @GetMapping("/assigned-to/{userId}")
     public ResponseEntity<Page<Lead>> getLeadsByAssignedUser(
             @PathVariable Long companyId,
@@ -229,16 +230,14 @@ public class LeadController {
         return ResponseEntity.ok(leads);
     }
 
-
- 
-
     @PostMapping("/{leadId}/remarks")
     public ResponseEntity<?> addRemarkToLead(
             @PathVariable Long leadId,
             @RequestBody Map<String, String> requestBody) {
 
         Optional<Lead> optionalLead = leadRepository.findById(leadId);
-        if (optionalLead.isEmpty()) return ResponseEntity.notFound().build();
+        if (optionalLead.isEmpty())
+            return ResponseEntity.notFound().build();
 
         String remarkText = requestBody.get("remark");
         String userIdStr = requestBody.get("userId");
@@ -272,17 +271,14 @@ public class LeadController {
         return ResponseEntity.ok("Remark added successfully");
     }
 
-
-
     @GetMapping("/{leadId}/remarks")
     public ResponseEntity<?> getRemarksByLeadId(@PathVariable Long leadId) {
-        if (!leadRepository.existsById(leadId)) return ResponseEntity.notFound().build();
+        if (!leadRepository.existsById(leadId))
+            return ResponseEntity.notFound().build();
 
         List<LeadRemark> remarks = leadRemarkRepository.findByLead_LeadId(leadId);
         return ResponseEntity.ok(remarks); // ✅ Returns list of LeadRemark with createdBy summary
     }
-
-
 
     @PutMapping("/{leadId}/assign/{userId}")
     public ResponseEntity<Lead> assignLead(
@@ -331,7 +327,6 @@ public class LeadController {
                 .orElse(ResponseEntity.badRequest().build());
     }
 
-
     @PutMapping("/{leadId}/unassign")
     public ResponseEntity<Lead> unassignLead(
             @PathVariable Long companyId,
@@ -359,14 +354,16 @@ public class LeadController {
                     // ✅ Notify previously assigned user
                     if (lead.getAssignedTo() != null) {
                         Long assignedUserId = lead.getAssignedTo().getUserId();
-                        String msgToAssignedUser = "❌ Lead \"" + leadName + "\" has been unassigned from you by " + unassignerRole + " " + unassignerName;
+                        String msgToAssignedUser = "❌ Lead \"" + leadName + "\" has been unassigned from you by "
+                                + unassignerRole + " " + unassignerName;
                         notificationService.sendNotification(assignedUserId, lead.getCompany(), msgToAssignedUser);
                     }
 
                     // ✅ Notify creator if USER
                     User creator = lead.getCreatedBy();
                     if (creator != null && creator.getRole() == User.Role.USER) {
-                        String msgToCreator = "📋 Lead \"" + leadName + "\" was unassigned by " + unassignerRole + " " + unassignerName;
+                        String msgToCreator = "📋 Lead \"" + leadName + "\" was unassigned by " + unassignerRole + " "
+                                + unassignerName;
                         notificationService.sendNotification(creator.getUserId(), lead.getCompany(), msgToCreator);
                     }
 
@@ -393,23 +390,21 @@ public class LeadController {
                         : ResponseEntity.status(403).body("Lead does not belong to this company."))
                 .orElse(ResponseEntity.notFound().build());
     }
-    
+
     @GetMapping("/count")
     public ResponseEntity<Long> getTotalLeadCount(@PathVariable Long companyId) {
         long count = leadRepository.countByCompany_Id(companyId);
         return ResponseEntity.ok(count);
     }
 
-    
     @GetMapping("/count/closed")
     public ResponseEntity<Long> countClosedLeads(@PathVariable Long companyId) {
-        // Count both CLOSED and DROPED leads together
+        // Count both CLOSED and DROPPED leads together
         List<Lead.LeadStatus> statuses = List.of(Lead.LeadStatus.CLOSED, Lead.LeadStatus.DROPED);
         long count = leadRepository.countByCompany_IdAndStatusIn(companyId, statuses);
         return ResponseEntity.ok(count);
     }
 
-    
     @GetMapping("/created-or-assigned/{userId}")
     public ResponseEntity<Page<Lead>> getLeadsCreatedOrAssignedTo(
             @PathVariable Long companyId,
@@ -419,21 +414,16 @@ public class LeadController {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
-        // Filter out DROPED leads
+        // Filter out DROPPED leads
         Page<Lead> leads = leadRepository.findByCompany_IdAndStatusNotAndCreatedBy_UserIdOrAssignedTo_UserId(
                 companyId,
                 Lead.LeadStatus.DROPED, // Status to exclude
                 userId,
                 userId,
-                pageable
-        );
+                pageable);
 
         return ResponseEntity.ok(leads);
     }
-
-
-    
-    
 
     @GetMapping("/count-for-user/{userId}")
     public ResponseEntity<Map<String, Long>> countLeadsForUser(
@@ -472,105 +462,101 @@ public class LeadController {
         response.put("assignedCount", assignedCount);
         response.put("createdCount", createdCount);
         response.put("total", total);
-        response.put("closedCount", closedCount);  // 🆕 Closed leads count
+        response.put("closedCount", closedCount); // 🆕 Closed leads count
 
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/search")
     public Page<Lead> getLeads(
-        @PathVariable Long companyId,
-        @RequestParam(required = false) List<String> keywords,
-        @RequestParam(required = false) String status,
-        @RequestParam(required = false) BigDecimal minBudget,
-        @RequestParam(required = false) BigDecimal maxBudget,
-        @RequestParam(required = false) Long createdBy,
-        @RequestParam(required = false) String source,  // ✅ NEW
-        @RequestParam(required = false) String action,  // ✅ NEW - handles ASSIGNED/UNASSIGNED
-        Pageable pageable
-    ) {
+            @PathVariable Long companyId,
+            @RequestParam(required = false) List<String> keywords,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) BigDecimal minBudget,
+            @RequestParam(required = false) BigDecimal maxBudget,
+            @RequestParam(required = false) Long createdBy,
+            @RequestParam(required = false) String source, // ✅ NEW
+            @RequestParam(required = false) String action, // ✅ NEW - handles ASSIGNED/UNASSIGNED
+            Pageable pageable) {
         // For multiple keywords, use the new method that handles two keywords
         if (keywords != null && keywords.size() >= 2) {
-            return leadRepository.searchLeadsWithTwoKeywords(companyId, keywords.get(0), keywords.get(1), status, minBudget, maxBudget, createdBy, source, action, pageable);
+            return leadRepository.searchLeadsWithTwoKeywords(companyId, keywords.get(0), keywords.get(1), status,
+                    minBudget, maxBudget, createdBy, source, action, pageable);
         } else if (keywords != null && keywords.size() == 1) {
             // Single keyword - use the original method
-            return leadService.searchLeads(companyId, keywords.get(0), status, minBudget, maxBudget, createdBy, source, action, pageable);
+            return leadService.searchLeads(companyId, keywords.get(0), status, minBudget, maxBudget, createdBy, source,
+                    action, pageable);
         } else {
             // No keywords - use the original method
-            return leadService.searchLeads(companyId, null, status, minBudget, maxBudget, createdBy, source, action, pageable);
+            return leadService.searchLeads(companyId, null, status, minBudget, maxBudget, createdBy, source, action,
+                    pageable);
         }
     }
 
-    
     @GetMapping("/created-or-assigned/{userId}/search")
     public Page<Lead> searchLeadsCreatedOrAssignedToUser(
-        @PathVariable Long companyId,
-        @PathVariable Long userId,
-        @RequestParam(required = false) List<String> keywords,
-        @RequestParam(required = false) String status,
-        @RequestParam(required = false) BigDecimal minBudget,
-        @RequestParam(required = false) BigDecimal maxBudget,
-        @RequestParam(required = false) String source,
-        @RequestParam(required = false) String action,
-        Pageable pageable
-    ) {
-        // For multiple keywords, create a search string that matches any of the keywords
+            @PathVariable Long companyId,
+            @PathVariable Long userId,
+            @RequestParam(required = false) List<String> keywords,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) BigDecimal minBudget,
+            @RequestParam(required = false) BigDecimal maxBudget,
+            @RequestParam(required = false) String source,
+            @RequestParam(required = false) String action,
+            Pageable pageable) {
+        // For multiple keywords, create a search string that matches any of the
+        // keywords
         String searchString = null;
         if (keywords != null && !keywords.isEmpty()) {
             // Create a search pattern that matches any of the keywords
             // This will be handled by the SQL LIKE conditions
             searchString = keywords.get(0); // Use first keyword for now
         }
-        
-        return leadRepository.searchLeadsCreatedOrAssigned(companyId, userId, searchString, status, minBudget, maxBudget, source, action, pageable);
-    }
 
+        return leadRepository.searchLeadsCreatedOrAssigned(companyId, userId, searchString, status, minBudget,
+                maxBudget, source, action, pageable);
+    }
 
     @GetMapping("/visible-to-admin/{adminId}/search")
     public Page<Lead> searchLeadsVisibleToAdmin(
-        @PathVariable Long companyId,
-        @PathVariable Long adminId,
-        @RequestParam(required = false) Long createdBy,  // 👈 Added this
-        @RequestParam(required = false) List<String> keywords,
-        @RequestParam(required = false) String status,
-        @RequestParam(required = false) BigDecimal minBudget,
-        @RequestParam(required = false) BigDecimal maxBudget,
-        @RequestParam(required = false) String source,
-        @RequestParam(required = false) String action,
-        Pageable pageable
-    ) {
-        // For multiple keywords, create a search string that matches any of the keywords
+            @PathVariable Long companyId,
+            @PathVariable Long adminId,
+            @RequestParam(required = false) Long createdBy, // 👈 Added this
+            @RequestParam(required = false) List<String> keywords,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) BigDecimal minBudget,
+            @RequestParam(required = false) BigDecimal maxBudget,
+            @RequestParam(required = false) String source,
+            @RequestParam(required = false) String action,
+            Pageable pageable) {
+        // For multiple keywords, create a search string that matches any of the
+        // keywords
         String searchString = null;
         if (keywords != null && !keywords.isEmpty()) {
             // Create a search pattern that matches any of the keywords
             // This will be handled by the SQL LIKE conditions
             searchString = keywords.get(0); // Use first keyword for now
         }
-        
+
         return leadRepository.searchLeadsVisibleToAdmin(
-            companyId,
-            adminId,
-            createdBy,   // 👈 Pass it here too
-            searchString,
-            status,
-            minBudget,
-            maxBudget,
-            source,
-            action,
-            pageable
-        );
+                companyId,
+                adminId,
+                createdBy, // 👈 Pass it here too
+                searchString,
+                status,
+                minBudget,
+                maxBudget,
+                source,
+                action,
+                pageable);
     }
-
-
-
 
     @GetMapping("/admin-visible/{adminId}")
     public ResponseEntity<Page<Lead>> getAllActiveLeadsVisibleToAdmin(
             @PathVariable Long companyId,
             @PathVariable Long adminId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
+            @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("created_at").descending());
 
         // Direct native query call without LeadStatus.DROPED since native uses Strings.
@@ -578,24 +564,20 @@ public class LeadController {
 
         return ResponseEntity.ok(leadsPage);
     }
-    
+
     @GetMapping("/count-visible-to-admin/{adminId}")
     public ResponseEntity<Long> countLeadsVisibleToAdmin(@PathVariable Long companyId, @PathVariable Long adminId) {
         long count = leadRepository.countLeadsVisibleToAdmin(companyId, adminId);
         return ResponseEntity.ok(count);
     }
 
-    
     @GetMapping("/count/closed-droped")
     public Long countClosedLeadsByAdmin(
-      @RequestParam Long companyId,
-      @RequestParam Long adminId
-    ) {
+            @RequestParam Long companyId,
+            @RequestParam Long adminId) {
         return leadRepository.countClosedLeadsForAdmin(companyId, adminId);
     }
-    
-    
-    
+
     @GetMapping("/count/summary/{userId}")
     public ResponseEntity<Map<String, Long>> getLeadCountSummary(
             @PathVariable Long companyId,
@@ -626,7 +608,8 @@ public class LeadController {
             response.put("totalClose", closed + dropped); // For deals overview - combined closed and dropped
 
         } else if (role == User.Role.ADMIN) {
-            // 🔹 ADMIN → createdBy admin or assignedTo admin + all assigned users under admin (excluding DROPPED)
+            // 🔹 ADMIN → createdBy admin or assignedTo admin + all assigned users under
+            // admin (excluding DROPPED)
             List<Long> userIdsUnderAdmin = userRepository.findByAdmin_UserId(userId)
                     .stream()
                     .map(User::getUserId) // ✅ entity ka correct getter
@@ -635,10 +618,14 @@ public class LeadController {
             userIdsUnderAdmin.add(userId); // include self
 
             long total = leadRepository.countActiveLeadsByUserIds(companyId, userIdsUnderAdmin);
-            long newLeads = leadRepository.countActiveLeadsByStatusAndUserIds(companyId, Lead.LeadStatus.NEW, userIdsUnderAdmin);
-            long contacted = leadRepository.countActiveLeadsByStatusAndUserIds(companyId, Lead.LeadStatus.CONTACTED, userIdsUnderAdmin);
-            long closed = leadRepository.countActiveLeadsByStatusAndUserIds(companyId, Lead.LeadStatus.CLOSED, userIdsUnderAdmin);
-            long dropped = leadRepository.countActiveLeadsByStatusAndUserIds(companyId, Lead.LeadStatus.DROPED, userIdsUnderAdmin);
+            long newLeads = leadRepository.countActiveLeadsByStatusAndUserIds(companyId, Lead.LeadStatus.NEW,
+                    userIdsUnderAdmin);
+            long contacted = leadRepository.countActiveLeadsByStatusAndUserIds(companyId, Lead.LeadStatus.CONTACTED,
+                    userIdsUnderAdmin);
+            long closed = leadRepository.countActiveLeadsByStatusAndUserIds(companyId, Lead.LeadStatus.CLOSED,
+                    userIdsUnderAdmin);
+            long dropped = leadRepository.countActiveLeadsByStatusAndUserIds(companyId, Lead.LeadStatus.DROPED,
+                    userIdsUnderAdmin);
 
             response.put("totalLeads", total);
             response.put("newLeads", newLeads);
@@ -650,10 +637,14 @@ public class LeadController {
         } else if (role == User.Role.USER) {
             // 🔹 USER → leads created by user OR assigned to user (excluding DROPPED)
             long total = leadRepository.countActiveLeadsByCreatedByOrAssignedTo(companyId, userId);
-            long newLeads = leadRepository.countActiveLeadsByStatusAndCreatedByOrAssignedTo(companyId, Lead.LeadStatus.NEW, userId);
-            long contacted = leadRepository.countActiveLeadsByStatusAndCreatedByOrAssignedTo(companyId, Lead.LeadStatus.CONTACTED, userId);
-            long closed = leadRepository.countActiveLeadsByStatusAndCreatedByOrAssignedTo(companyId, Lead.LeadStatus.CLOSED, userId);
-            long dropped = leadRepository.countActiveLeadsByStatusAndCreatedByOrAssignedTo(companyId, Lead.LeadStatus.DROPED, userId);
+            long newLeads = leadRepository.countActiveLeadsByStatusAndCreatedByOrAssignedTo(companyId,
+                    Lead.LeadStatus.NEW, userId);
+            long contacted = leadRepository.countActiveLeadsByStatusAndCreatedByOrAssignedTo(companyId,
+                    Lead.LeadStatus.CONTACTED, userId);
+            long closed = leadRepository.countActiveLeadsByStatusAndCreatedByOrAssignedTo(companyId,
+                    Lead.LeadStatus.CLOSED, userId);
+            long dropped = leadRepository.countActiveLeadsByStatusAndCreatedByOrAssignedTo(companyId,
+                    Lead.LeadStatus.DROPED, userId);
 
             response.put("totalLeads", total);
             response.put("newLeads", newLeads);
@@ -665,9 +656,5 @@ public class LeadController {
 
         return ResponseEntity.ok(response);
     }
-    
-
 
 }
-
-    

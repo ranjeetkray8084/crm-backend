@@ -12,6 +12,8 @@ import com.example.real_estate_crm.repository.LeadRepository;
 import com.example.real_estate_crm.repository.UserRepository;
 import com.example.real_estate_crm.service.dao.LeadDao;
 
+import java.util.ArrayList;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
@@ -142,7 +144,13 @@ public class LeadDaoImpl implements LeadDao {
     public List<Lead> getLeadsBySource(Long companyId, String source) {
         setTenantContext(companyId);
         Company company = getCompanyById(companyId);
-        return leadRepository.findBySourceIgnoreCaseAndCompany(source, company);
+        try {
+            Lead.Source sourceEnum = Lead.Source.valueOf(source.toUpperCase());
+            return leadRepository.findBySourceAndCompany(sourceEnum, company);
+        } catch (IllegalArgumentException e) {
+            // If source string doesn't match any enum value, return empty list
+            return new ArrayList<>();
+        }
     }
 
     @Override

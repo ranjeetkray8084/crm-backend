@@ -2,7 +2,6 @@ package com.example.real_estate_crm.repository;
 
 import com.example.real_estate_crm.model.Company;
 import com.example.real_estate_crm.model.Lead;
-import com.example.real_estate_crm.model.Property;
 import com.example.real_estate_crm.model.Lead.Action;
 import com.example.real_estate_crm.model.Lead.LeadStatus;
 import com.example.real_estate_crm.model.User;
@@ -23,14 +22,14 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 
     List<Lead> findByStatus(LeadStatus status);
     List<Lead> findByAssignedTo(User assignedTo);
-    List<Lead> findBySourceIgnoreCase(String source);
+    List<Lead> findBySource(Lead.Source source);
     List<Lead> findByAction(Action action);
     List<Lead> findByNameContainingIgnoreCase(String name);
     List<Lead> findByCreatedBy(User createdBy);
     List<Lead> findByCompany(Company company);
     Optional<Lead> findByLeadIdAndCompany(Long leadId, Company company);
     List<Lead> findByStatusAndCompany(LeadStatus status, Company company);
-    List<Lead> findBySourceIgnoreCaseAndCompany(String source, Company company);
+    List<Lead> findBySourceAndCompany(Lead.Source source, Company company);
 
     @Query("SELECT l FROM Lead l WHERE l.createdBy.userId = :userId AND l.company = :company")
     List<Lead> findByCreatorIdAndCompany(@Param("userId") Long userId, @Param("company") Company company);
