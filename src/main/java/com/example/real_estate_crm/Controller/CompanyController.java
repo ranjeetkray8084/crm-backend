@@ -113,7 +113,55 @@ public class CompanyController {
         }
     }
 
-    // ✅ 7. Get Company Name by ID
+    // ✅ 7. Update Company by ID
+    @PutMapping("/update/{id}")
+    public ResponseEntity<?> updateCompany(@PathVariable Long id, @RequestBody Company updatedCompany) {
+        // Get current user (should be developer)
+        User currentUser = SecurityUtil.getCurrentUser();
+        System.out.println("🔍 Updating company - Current user: " + (currentUser != null ? currentUser.getEmail() + " (" + currentUser.getRole() + ")" : "null"));
+        
+        if (currentUser == null || currentUser.getRole() != User.Role.DEVELOPER) {
+            return ResponseEntity.status(403).body("Only developers can update companies");
+        }
+
+        // Find existing company
+        Company existingCompany = companyDao.findById(id);
+        if (existingCompany == null) {
+            return ResponseEntity.status(404).body("Company not found");
+        }
+
+        // Validate input
+        if (updatedCompany.getMaxUsers() != null && updatedCompany.getMaxUsers() < 0) {
+            return ResponseEntity.badRequest().body("maxUsers must be >= 0");
+        }
+        if (updatedCompany.getMaxAdmins() != null && updatedCompany.getMaxAdmins() < 0) {
+            return ResponseEntity.badRequest().body("maxAdmins must be >= 0");
+        }
+
+        // Update fields if provided
+        if (updatedCompany.getName() != null && !updatedCompany.getName().trim().isEmpty()) {
+            existingCompany.setName(updatedCompany.getName().trim());
+        }
+        if (updatedCompany.getEmail() != null && !updatedCompany.getEmail().trim().isEmpty()) {
+            existingCompany.setEmail(updatedCompany.getEmail().trim());
+        }
+        if (updatedCompany.getPhone() != null && !updatedCompany.getPhone().trim().isEmpty()) {
+            existingCompany.setPhone(updatedCompany.getPhone().trim());
+        }
+        if (updatedCompany.getMaxUsers() != null) {
+            existingCompany.setMaxUsers(updatedCompany.getMaxUsers());
+        }
+        if (updatedCompany.getMaxAdmins() != null) {
+            existingCompany.setMaxAdmins(updatedCompany.getMaxAdmins());
+        }
+
+        System.out.println("💾 Updating company: " + existingCompany.getName());
+        Company savedCompany = companyDao.update(existingCompany);
+        System.out.println("✅ Company updated with ID: " + savedCompany.getId());
+        return ResponseEntity.ok(savedCompany);
+    }
+
+    // ✅ 8. Get Company Name by ID
     @GetMapping("/name/{id}")
     public ResponseEntity<String> getCompanyNameById(@PathVariable Long id) {
         Company company = companyDao.findById(id);
@@ -124,7 +172,7 @@ public class CompanyController {
         }
     }
 
-    // ✅ 8. Get Total Companies Count (For DEVELOPER dashboard)
+    // ✅ 9. Get Total Companies Count (For DEVELOPER dashboard)
     @GetMapping("/count")
     public ResponseEntity<Long> getTotalCompaniesCount() {
         try {
