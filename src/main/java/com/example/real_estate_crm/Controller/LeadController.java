@@ -573,7 +573,7 @@ public class LeadController {
 
     @GetMapping("/count/closed-droped")
     public Long countClosedLeadsByAdmin(
-            @RequestParam Long companyId,
+            @PathVariable Long companyId,
             @RequestParam Long adminId) {
         return leadRepository.countClosedLeadsForAdmin(companyId, adminId);
     }

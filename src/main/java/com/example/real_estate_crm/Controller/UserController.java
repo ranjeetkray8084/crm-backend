@@ -141,8 +141,17 @@ public class UserController {
 
             return ResponseEntity.status(HttpStatus.CREATED).body(new UserDTO(savedUser));
 
+        } catch (IllegalArgumentException e) {
+            // Handle specific validation errors (email/phone duplicates)
+            String errorMessage = e.getMessage();
+            if (errorMessage.contains("Email already exists") || errorMessage.contains("Phone number already exists")) {
+                return ResponseEntity.badRequest().body("User already exists");
+            } else {
+                return ResponseEntity.badRequest().body("❌ " + errorMessage);
+            }
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("❌ Error creating user: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(e.getMessage());
         }
     }
 
@@ -325,7 +334,7 @@ public class UserController {
             User user = userOpt.get();
             user.setAdmin(adminOpt.get());
             userRepository.save(user);
-            return ResponseEntity.ok("Admin assigned successfully");
+            return ResponseEntity.ok("User assigned successfully");
         }
         return ResponseEntity.badRequest().body("Invalid user/admin ID");
     }
@@ -341,7 +350,7 @@ public class UserController {
         user.setAdmin(null);
         userRepository.save(user);
 
-        return ResponseEntity.ok("Admin unassigned successfully.");
+        return ResponseEntity.ok("User unassigned successfully.");
     }
 
     @GetMapping("/count-by-admin/{adminId}")

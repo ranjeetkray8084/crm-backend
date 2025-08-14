@@ -28,8 +28,13 @@ public class UserDTO {
         this.role = user.getRole().name();
         this.status = user.getStatus() != null && user.getStatus() ? "active" : "inactive";
 
-        // Admin info
-        this.adminName = (user.getAdmin() != null) ? user.getAdmin().getName() : "No Admin";
+        // Admin info - only show admin for USER role
+        if (user.getRole() == User.Role.USER) {
+            this.adminName = (user.getAdmin() != null) ? user.getAdmin().getName() : "No Admin";
+        } else {
+            // ADMIN and DIRECTOR roles don't have admins
+            this.adminName = "N/A";
+        }
 
         // Company info
         if (user.getCompany() != null) {
