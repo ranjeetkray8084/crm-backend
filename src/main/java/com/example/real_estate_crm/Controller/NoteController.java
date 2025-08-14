@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -206,6 +207,74 @@ public class NoteController {
                 .forEach(notes::add);
 
         return ResponseEntity.ok(notes);
+    }
+
+    /**
+     * Get today's events for admin dashboard (including director-created events)
+     */
+    @GetMapping("/today-events-admin")
+    public ResponseEntity<List<Note>> getTodayEventsForAdmin(
+            @PathVariable Long companyId,
+            @RequestParam Long adminId
+    ) {
+        try {
+            // Get today's date
+            LocalDate today = LocalDate.now();
+            
+            // 1. Get all notes that admins should see (including director-created ones)
+            List<Note> allAdminNotes = new ArrayList<>();
+            
+            // Get notes from assigned users
+            List<User> assignedUsers = userRepository.findByCompanyIdAndAdmin_UserId(companyId, adminId);
+            List<Long> assignedUserIds = assignedUsers.stream().map(User::getUserId).toList();
+            
+            if (!assignedUserIds.isEmpty()) {
+                List<Visibility> visibilities = List.of(Visibility.ALL_USERS, Visibility.ME_AND_ADMIN);
+                allAdminNotes.addAll(noteRepository.findAllByCompany_IdAndVisibilityInAndUserIdIn(
+                        companyId, visibilities, assignedUserIds
+                ));
+            }
+            
+            // Get ALL_ADMIN notes from any user
+            allAdminNotes.addAll(noteRepository.findAllByCompany_IdAndVisibility(
+                    companyId, Visibility.ALL_ADMIN
+            ));
+            
+            // Get SPECIFIC_ADMIN notes visible to this admin
+            allAdminNotes.addAll(noteRepository.findAllByCompany_IdAndVisibilityAndVisibleUserIdsContaining(
+                    companyId, Visibility.SPECIFIC_ADMIN, adminId
+            ));
+            
+            // Get notes created by directors (admins need to see director events)
+            List<User> directors = userRepository.findByCompanyIdAndRole(companyId, User.Role.DIRECTOR);
+            List<Long> directorIds = directors.stream().map(User::getUserId).toList();
+            
+            if (!directorIds.isEmpty()) {
+                // Get director notes with appropriate visibility
+                List<Visibility> directorVisibilities = List.of(
+                        Visibility.ALL_USERS, 
+                        Visibility.ME_AND_ADMIN, 
+                        Visibility.ALL_ADMIN, 
+                        Visibility.ME_AND_DIRECTOR
+                );
+                allAdminNotes.addAll(noteRepository.findAllByCompany_IdAndVisibilityInAndUserIdIn(
+                        companyId, directorVisibilities, directorIds
+                ));
+            }
+            
+            // 2. Filter for today's events only
+            List<Note> todayEvents = allAdminNotes.stream()
+                    .filter(note -> note.getDateTime() != null && 
+                            note.getStatus() != Status.COMPLETED &&
+                            note.getDateTime().toLocalDate().equals(today))
+                    .distinct()
+                    .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(todayEvents);
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
 

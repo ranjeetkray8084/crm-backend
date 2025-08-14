@@ -38,6 +38,13 @@ public class TaskFile {
     @Column(name = "upload_date")
     private LocalDateTime uploadDate = LocalDateTime.now();
     
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TaskStatus status = TaskStatus.NEW;
+    
+    @Column(name = "assigned_to_date")
+    private LocalDateTime assignedToDate;
+    
     @JsonProperty("createdBy")
     public UserSummary getCreatedBySummary() {
         if (uploadedBy != null) {
@@ -50,5 +57,8 @@ public class TaskFile {
     public String getCreatedByName() {
         return uploadedBy != null ? uploadedBy.getName() : "Unknown";
     }
-
+    
+    public enum TaskStatus {
+        NEW, UNDER_PROCESS, COMPLETED
+    }
 }

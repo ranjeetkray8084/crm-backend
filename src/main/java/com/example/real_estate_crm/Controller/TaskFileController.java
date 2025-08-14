@@ -13,6 +13,10 @@ import com.example.real_estate_crm.service.dao.TaskFileDao;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Row;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.*;
@@ -38,13 +42,44 @@ public class TaskFileController {
     private final CompanyRepository companyRepo;
     private final NotificationService notification;
     private final Path uploadDir = Paths.get("uploads");
+    
+    // Maximum allowed dimensions for Excel files
+    private static final int MAX_COLUMNS = 6;
+    private static final int MAX_ROWS = 600;
 
-    // ✅ 1. Upload Excel File
+    // 1. Upload Excel File
     @PostMapping("/upload")
     public ResponseEntity<?> uploadExcelFile(@RequestParam("title") String title,
-                                             @RequestParam("companyId") Long companyId,
-                                             @RequestParam("uploadedBy") Long uploadedById,
-                                             @RequestParam("file") MultipartFile file) throws IOException {
+            @RequestParam("companyId") Long companyId,
+            @RequestParam("uploadedBy") Long uploadedById,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        
+        // Validate file type
+        String contentType = file.getContentType();
+        if (contentType == null || (!contentType.equals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") 
+                && !contentType.equals("application/vnd.ms-excel"))) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("❌ Invalid file type. Only Excel files (.xlsx, .xls) are allowed.");
+        }
+
+        // Validate file size (10MB limit)
+        if (file.getSize() > 10 * 1024 * 1024) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("❌ File size too large. Maximum allowed size is 10MB.");
+        }
+
+        // Validate Excel file dimensions
+        try {
+            String dimensionValidation = validateExcelDimensions(file);
+            if (dimensionValidation != null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("❌ " + dimensionValidation);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("❌ Error validating Excel file: " + e.getMessage());
+        }
+
         if (!Files.exists(uploadDir)) {
             Files.createDirectories(uploadDir);
         }
@@ -65,26 +100,30 @@ public class TaskFileController {
                 .companyId(companyId)
                 .uploadedBy(uploadedBy)
                 .uploadDate(LocalDateTime.now())
+                .status(TaskFile.TaskStatus.NEW)
                 .build();
 
         taskFileDao.save(task);
         return ResponseEntity.ok("File uploaded successfully.");
     }
 
-    // ✅ 2. Assign/Unassign Task
+    // 2. Assign/Unassign Task
     @PutMapping("/{taskId}/assign")
     public ResponseEntity<String> assignTaskToUser(@PathVariable Long taskId,
-                                                   @RequestParam(required = false) Long userId,
-                                                   @RequestParam Long companyId) {
+            @RequestParam(required = false) Long userId,
+            @RequestParam Long companyId) {
+
+
 
         Optional<TaskFile> optionalTaskFile = taskrepo.findByIdAndCompanyId(taskId, companyId);
         if (optionalTaskFile.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ Task not found for the given company.");
+
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Task not found for the given company.");
         }
 
         Optional<Company> optionalCompany = companyRepo.findById(companyId);
         if (optionalCompany.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ Company not found.");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Company not found.");
         }
 
         Company company = optionalCompany.get();
@@ -105,10 +144,20 @@ public class TaskFileController {
                 });
             }
 
-            return ResponseEntity.ok("✅ Task unassigned successfully.");
+            return ResponseEntity.ok("Task unassigned successfully.");
         } else {
             // Assign logic
+
+            
+            // Check if user exists
+            Optional<User> userToAssign = userRepository.findById(userId);
+            if (userToAssign.isEmpty()) {
+
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("❌ User not found.");
+            }
+            
             taskFile.setAssignedTo(userId);
+            taskFile.setAssignedToDate(LocalDateTime.now());
             taskFileDao.save(taskFile);
 
             // Notify ONLY the newly assigned user
@@ -134,13 +183,13 @@ public class TaskFileController {
     // ✅ 3. Preview Excel Data
     @GetMapping("/{taskId}/preview")
     public ResponseEntity<List<List<String>>> previewExcel(@PathVariable Long taskId,
-                                                           @RequestParam Long companyId) throws Exception {
+            @RequestParam Long companyId) throws Exception {
         TaskFile task = taskFileDao.findById(taskId)
                 .filter(f -> Objects.equals(f.getCompanyId(), companyId))
                 .orElseThrow(() -> new RuntimeException("Unauthorized or Not Found")); // Consider specific exception
 
         try (FileInputStream fis = new FileInputStream(task.getFilePath());
-             Workbook workbook = new XSSFWorkbook(fis)) {
+                Workbook workbook = new XSSFWorkbook(fis)) {
 
             Sheet sheet = workbook.getSheetAt(0);
             List<List<String>> data = new ArrayList<>();
@@ -179,15 +228,17 @@ public class TaskFileController {
     // ✅ 4. Get Assigned Tasks
     @GetMapping("/assigned")
     public ResponseEntity<List<TaskFileDTO>> getAssignedFiles(@RequestParam Long companyId,
-                                                           @RequestParam Long userId) {
+            @RequestParam Long userId) {
         List<TaskFile> assignedFiles = taskrepo.findByCompanyIdAndAssignedToOrderByUploadDateDesc(companyId, userId);
 
         // Extract all unique user IDs (assignedTo and uploadedBy) to minimize DB calls
         Set<Long> allUserIds = assignedFiles.stream()
                 .map(task -> {
                     Set<Long> ids = new HashSet<>();
-                    if (task.getAssignedTo() != null) ids.add(task.getAssignedTo());
-                    if (task.getUploadedBy() != null) ids.add(task.getUploadedBy().getUserId());
+                    if (task.getAssignedTo() != null)
+                        ids.add(task.getAssignedTo());
+                    if (task.getUploadedBy() != null)
+                        ids.add(task.getUploadedBy().getUserId());
                     return ids;
                 })
                 .flatMap(Set::stream)
@@ -198,8 +249,7 @@ public class TaskFileController {
         Map<Long, UserSummary> userMap = userRepository.findAllById(allUserIds).stream()
                 .collect(Collectors.toMap(
                         User::getUserId,
-                        user -> new UserSummary(user.getUserId(), user.getName())
-                ));
+                        user -> new UserSummary(user.getUserId(), user.getName())));
 
         // Build DTOs
         List<TaskFileDTO> dtos = assignedFiles.stream()
@@ -208,15 +258,17 @@ public class TaskFileController {
                         .title(task.getTitle())
                         .uploadDate(task.getUploadDate())
                         .assignedTo(
-                                task.getAssignedTo() != null ? userMap.get(task.getAssignedTo()) : null
-                        )
+                                task.getAssignedTo() != null ? userMap.get(task.getAssignedTo()) : null)
+                        .uploadedBy(
+                                task.getUploadedBy() != null ? task.getUploadedBy().getUserId() : null)
                         .uploadedByName(
                                 task.getUploadedBy() != null && userMap.containsKey(task.getUploadedBy().getUserId())
                                         ? userMap.get(task.getUploadedBy().getUserId()).getName()
                                         : "Unknown" // Fallback if uploader is null or not found
                         )
-                        .build()
-                )
+                        .status(task.getStatus())  // ✅ Added missing status field
+                        .assignedToDate(task.getAssignedToDate())  // ✅ Added missing assignedToDate field
+                        .build())
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(dtos);
@@ -225,10 +277,10 @@ public class TaskFileController {
     // ✅ 5. Update Cell in Excel File
     @PatchMapping("/{taskId}/update-cell")
     public ResponseEntity<?> updateCell(@PathVariable Long taskId,
-                                        @RequestParam Long companyId,
-                                        @RequestParam int row,
-                                        @RequestParam int col,
-                                        @RequestParam String newValue) throws Exception {
+            @RequestParam Long companyId,
+            @RequestParam int row,
+            @RequestParam int col,
+            @RequestParam String newValue) throws Exception {
         TaskFile task = taskFileDao.findById(taskId)
                 .filter(f -> Objects.equals(f.getCompanyId(), companyId))
                 .orElseThrow(() -> new RuntimeException("Unauthorized or Not Found")); // Consider specific exception
@@ -249,7 +301,8 @@ public class TaskFileController {
 
             Sheet sheet = workbook.getSheetAt(0);
             Row targetRow = sheet.getRow(row);
-            if (targetRow == null) targetRow = sheet.createRow(row);
+            if (targetRow == null)
+                targetRow = sheet.createRow(row);
 
             Cell cell = targetRow.getCell(col, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
             cell.setCellValue(newValue);
@@ -264,18 +317,16 @@ public class TaskFileController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("❌ Failed to update cell: " + e.getMessage());
         } finally {
-            if (workbook != null) workbook.close(); // Close workbook in finally block
+            if (workbook != null)
+                workbook.close(); // Close workbook in finally block
         }
     }
-
-  
-
 
     // ✅ 6. Delete Column in Excel File
     @DeleteMapping("/{taskId}/delete-column") // Using DELETE for a deletion operation
     public ResponseEntity<String> deleteColumn(@PathVariable Long taskId,
-                                               @RequestParam Long companyId,
-                                               @RequestParam int colIndex) { // 0-indexed column to delete
+            @RequestParam Long companyId,
+            @RequestParam int colIndex) { // 0-indexed column to delete
 
         Optional<TaskFile> optionalTaskFile = taskrepo.findByIdAndCompanyId(taskId, companyId);
         if (optionalTaskFile.isEmpty()) {
@@ -300,7 +351,7 @@ public class TaskFileController {
             Sheet sheet = workbook.getSheetAt(0); // Assuming you always work with the first sheet
 
             if (colIndex < 0) {
-                 return ResponseEntity.badRequest().body("Column index cannot be negative.");
+                return ResponseEntity.badRequest().body("Column index cannot be negative.");
             }
 
             // Find the maximum column index used across all rows for correct shifting
@@ -312,7 +363,8 @@ public class TaskFileController {
                 }
             }
 
-            // If the column to delete is beyond the last existing column, it's an invalid request.
+            // If the column to delete is beyond the last existing column, it's an invalid
+            // request.
             // Note: lastColumn is 1-indexed, colIndex is 0-indexed.
             if (colIndex >= lastColumn) { // Check if colIndex is at or beyond the last actual column
                 return ResponseEntity.badRequest().body("Column index is out of bounds or column does not exist.");
@@ -322,10 +374,14 @@ public class TaskFileController {
             // Cells from (colIndex + 1) up to lastColumn are shifted left by 1 position.
             sheet.shiftColumns(colIndex + 1, lastColumn, -1);
 
-            // After shifting, the previous 'lastColumn' now contains the original 'lastColumn - 1' content.
-            // Any cells in what was originally 'lastColumn' are now effectively empty, but might still exist.
-            // To properly remove them, iterate through rows and remove the cell at the new 'lastColumn - 1' position.
-            // This loop ensures the rightmost column's cells are truly removed after the shift.
+            // After shifting, the previous 'lastColumn' now contains the original
+            // 'lastColumn - 1' content.
+            // Any cells in what was originally 'lastColumn' are now effectively empty, but
+            // might still exist.
+            // To properly remove them, iterate through rows and remove the cell at the new
+            // 'lastColumn - 1' position.
+            // This loop ensures the rightmost column's cells are truly removed after the
+            // shift.
             for (int r = sheet.getFirstRowNum(); r <= sheet.getLastRowNum(); r++) {
                 org.apache.poi.ss.usermodel.Row row = sheet.getRow(r);
                 if (row != null) {
@@ -359,12 +415,10 @@ public class TaskFileController {
         }
     }
 
-  
-
     // ✅ 7. Download Excel File
     @GetMapping("/{taskId}/download")
     public ResponseEntity<Resource> downloadFile(@PathVariable Long taskId,
-                                                 @RequestParam Long companyId) throws Exception {
+            @RequestParam Long companyId) throws Exception {
         TaskFile task = taskFileDao.findById(taskId)
                 .filter(f -> Objects.equals(f.getCompanyId(), companyId))
                 .orElseThrow(() -> new RuntimeException("Unauthorized or Not Found")); // Consider specific exception
@@ -374,7 +428,8 @@ public class TaskFileController {
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + task.getTitle() + "\"")
-                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .contentType(
+                        MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(file);
     }
 
@@ -387,8 +442,10 @@ public class TaskFileController {
         Set<Long> allUserIds = taskFiles.stream()
                 .map(task -> {
                     Set<Long> ids = new HashSet<>();
-                    if (task.getAssignedTo() != null) ids.add(task.getAssignedTo());
-                    if (task.getUploadedBy() != null) ids.add(task.getUploadedBy().getUserId());
+                    if (task.getAssignedTo() != null)
+                        ids.add(task.getAssignedTo());
+                    if (task.getUploadedBy() != null)
+                        ids.add(task.getUploadedBy().getUserId());
                     return ids;
                 })
                 .flatMap(Set::stream)
@@ -399,8 +456,7 @@ public class TaskFileController {
         Map<Long, UserSummary> userMap = userRepository.findAllById(allUserIds).stream()
                 .collect(Collectors.toMap(
                         User::getUserId,
-                        user -> new UserSummary(user.getUserId(), user.getName())
-                ));
+                        user -> new UserSummary(user.getUserId(), user.getName())));
 
         // Build DTOs
         List<TaskFileDTO> dtos = taskFiles.stream()
@@ -409,15 +465,17 @@ public class TaskFileController {
                         .title(task.getTitle())
                         .uploadDate(task.getUploadDate())
                         .assignedTo(
-                                task.getAssignedTo() != null ? userMap.get(task.getAssignedTo()) : null
-                        )
+                                task.getAssignedTo() != null ? userMap.get(task.getAssignedTo()) : null)
+                        .uploadedBy(
+                                task.getUploadedBy() != null ? task.getUploadedBy().getUserId() : null)
                         .uploadedByName(
                                 task.getUploadedBy() != null && userMap.containsKey(task.getUploadedBy().getUserId())
                                         ? userMap.get(task.getUploadedBy().getUserId()).getName()
                                         : "Unknown" // Fallback if uploader is null or not found
                         )
-                        .build()
-                )
+                        .status(task.getStatus())
+                        .assignedToDate(task.getAssignedToDate())
+                        .build())
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(dtos);
@@ -426,8 +484,9 @@ public class TaskFileController {
     // ✅ 9. Get Tasks Uploaded by Specific User
     @GetMapping("/uploaded")
     public ResponseEntity<List<TaskFileDTO>> getTasksUploadedByUser(@RequestParam Long uploadedById,
-                                                                  @RequestParam Long companyId) {
-        List<TaskFile> taskFiles = taskrepo.findByCompanyIdAndUploadedBy_UserIdOrderByUploadDateDesc(companyId, uploadedById);
+            @RequestParam Long companyId) {
+        List<TaskFile> taskFiles = taskrepo.findByCompanyIdAndUploadedBy_UserIdOrderByUploadDateDesc(companyId,
+                uploadedById);
 
         // Collect all user IDs involved (assigned and the uploader)
         Set<Long> allRelatedUserIds = taskFiles.stream()
@@ -439,8 +498,7 @@ public class TaskFileController {
         Map<Long, UserSummary> userMap = userRepository.findAllById(allRelatedUserIds).stream()
                 .collect(Collectors.toMap(
                         User::getUserId,
-                        user -> new UserSummary(user.getUserId(), user.getName())
-                ));
+                        user -> new UserSummary(user.getUserId(), user.getName())));
 
         List<TaskFileDTO> dtos = taskFiles.stream()
                 .map(task -> TaskFileDTO.builder()
@@ -448,17 +506,46 @@ public class TaskFileController {
                         .title(task.getTitle())
                         .uploadDate(task.getUploadDate())
                         .assignedTo(task.getAssignedTo() != null ? userMap.get(task.getAssignedTo()) : null)
-                        .uploadedByName(userMap.getOrDefault(uploadedById, new UserSummary(uploadedById, "Unknown")).getName())
+                        .uploadedBy(uploadedById)
+                        .uploadedByName(
+                                userMap.getOrDefault(uploadedById, new UserSummary(uploadedById, "Unknown")).getName())
+                        .status(task.getStatus())
+                        .assignedToDate(task.getAssignedToDate())
                         .build())
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(dtos);
     }
 
-    // ✅ 10. Delete Task (and its associated file)
+    // ✅ 10. Update Task Status
+    @PutMapping("/{taskId}/status")
+    public ResponseEntity<String> updateTaskStatus(@PathVariable Long taskId,
+            @RequestParam Long companyId,
+            @RequestParam String status) {
+        Optional<TaskFile> optionalTask = taskFileDao.findById(taskId)
+                .filter(t -> Objects.equals(t.getCompanyId(), companyId));
+
+        if (optionalTask.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Task not found for the given company.");
+        }
+
+        TaskFile task = optionalTask.get();
+
+        try {
+            TaskFile.TaskStatus newStatus = TaskFile.TaskStatus.valueOf(status.toUpperCase());
+            task.setStatus(newStatus);
+            taskFileDao.save(task);
+            return ResponseEntity.ok("Task status updated successfully.");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Invalid status. Valid statuses are: NEW, UNDER_PROCESS, COMPLETED");
+        }
+    }
+
+    // ✅ 11. Delete Task (and its associated file)
     @DeleteMapping("/{taskId}")
     public ResponseEntity<String> deleteTask(@PathVariable Long taskId,
-                                           @RequestParam Long companyId) {
+            @RequestParam Long companyId) {
         Optional<TaskFile> optionalTask = taskFileDao.findById(taskId)
                 .filter(t -> Objects.equals(t.getCompanyId(), companyId));
 
@@ -480,11 +567,13 @@ public class TaskFileController {
         }
     }
 
-    // ✅ 11. Admin: Get All Tasks related to Admin's managed users (including admin's own tasks)
+    // ✅ 11. Admin: Get All Tasks related to Admin's managed users (including
+    // admin's own tasks)
     @GetMapping("/admin-all")
     public ResponseEntity<List<TaskFileDTO>> getAllTasksForAdmin(@RequestParam Long adminId,
-                                                                 @RequestParam Long companyId) {
-        // Step 1: Get all users under this admin (assuming 'adminId' is the ID of an admin user)
+            @RequestParam Long companyId) {
+        // Step 1: Get all users under this admin (assuming 'adminId' is the ID of an
+        // admin user)
         List<User> usersUnderAdmin = userRepository.findByAdmin_UserId(adminId);
         Set<Long> userIdsUnderAdmin = usersUnderAdmin.stream()
                 .map(User::getUserId)
@@ -493,13 +582,14 @@ public class TaskFileController {
         // Step 2: Add the admin himself to the set of managed users
         userIdsUnderAdmin.add(adminId);
 
-        // Step 3: Fetch all tasks for the company and then filter by uploadedBy OR assignedTo users
-        // Using a Map to prevent duplicates if a task is both uploaded by and assigned to a managed user
+        // Step 3: Fetch all tasks for the company and then filter by uploadedBy OR
+        // assignedTo users
+        // Using a Map to prevent duplicates if a task is both uploaded by and assigned
+        // to a managed user
         List<TaskFile> allTasks = taskrepo.findByCompanyIdOrderByUploadDateDesc(companyId).stream()
-                .filter(task ->
-                        (task.getUploadedBy() != null && userIdsUnderAdmin.contains(task.getUploadedBy().getUserId())) ||
-                        (task.getAssignedTo() != null && userIdsUnderAdmin.contains(task.getAssignedTo()))
-                )
+                .filter(task -> (task.getUploadedBy() != null
+                        && userIdsUnderAdmin.contains(task.getUploadedBy().getUserId())) ||
+                        (task.getAssignedTo() != null && userIdsUnderAdmin.contains(task.getAssignedTo())))
                 .collect(Collectors.toMap(
                         TaskFile::getId,
                         task -> task,
@@ -510,19 +600,20 @@ public class TaskFileController {
                 .stream()
                 .collect(Collectors.toList());
 
-
-        // Step 4: Fetch all needed user data (for uploadedBy and assignedTo) in one batch DB call
+        // Step 4: Fetch all needed user data (for uploadedBy and assignedTo) in one
+        // batch DB call
         Set<Long> allRelatedUserIds = new HashSet<>();
         for (TaskFile task : allTasks) {
-            if (task.getUploadedBy() != null) allRelatedUserIds.add(task.getUploadedBy().getUserId());
-            if (task.getAssignedTo() != null) allRelatedUserIds.add(task.getAssignedTo());
+            if (task.getUploadedBy() != null)
+                allRelatedUserIds.add(task.getUploadedBy().getUserId());
+            if (task.getAssignedTo() != null)
+                allRelatedUserIds.add(task.getAssignedTo());
         }
 
         Map<Long, UserSummary> userMap = userRepository.findAllById(allRelatedUserIds).stream()
                 .collect(Collectors.toMap(
                         User::getUserId,
-                        user -> new UserSummary(user.getUserId(), user.getName())
-                ));
+                        user -> new UserSummary(user.getUserId(), user.getName())));
 
         // Step 5: Build DTO list
         List<TaskFileDTO> dtos = allTasks.stream()
@@ -531,16 +622,62 @@ public class TaskFileController {
                         .title(task.getTitle())
                         .uploadDate(task.getUploadDate())
                         .assignedTo(task.getAssignedTo() != null ? userMap.get(task.getAssignedTo()) : null)
+                        .uploadedBy(
+                                task.getUploadedBy() != null ? task.getUploadedBy().getUserId() : null)
                         .uploadedByName(
                                 task.getUploadedBy() != null && userMap.containsKey(task.getUploadedBy().getUserId())
                                         ? userMap.get(task.getUploadedBy().getUserId()).getName()
                                         : "Unknown" // Fallback
                         )
-                        .build()
-                )
+                        .status(task.getStatus())  // ✅ Added missing status field
+                        .assignedToDate(task.getAssignedToDate())  // ✅ Added missing assignedToDate field
+                        .build())
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(dtos);
+    }
+
+    // ✅ Validate Excel file dimensions
+    private String validateExcelDimensions(MultipartFile file) throws IOException {
+        try (InputStream inputStream = file.getInputStream()) {
+            Workbook workbook;
+            
+            if (file.getOriginalFilename() != null && file.getOriginalFilename().toLowerCase().endsWith(".xlsx")) {
+                workbook = new XSSFWorkbook(inputStream);
+            } else {
+                workbook = new HSSFWorkbook(inputStream);
+            }
+            
+            Sheet sheet = workbook.getSheetAt(0);
+            int maxRow = sheet.getLastRowNum() + 1; // +1 because getLastRowNum() is 0-indexed
+            int maxCol = 0;
+            
+            // Find the maximum column with data
+            for (int i = 0; i <= sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                if (row != null) {
+                    int lastCellNum = row.getLastCellNum();
+                    if (lastCellNum > maxCol) {
+                        maxCol = lastCellNum;
+                    }
+                }
+            }
+            
+            workbook.close();
+            
+            // Validate dimensions
+            if (maxCol > MAX_COLUMNS) {
+                return String.format("File has %d columns. Maximum allowed is %d columns.", maxCol, MAX_COLUMNS);
+            }
+            
+            if (maxRow > MAX_ROWS) {
+                return String.format("File has %d rows. Maximum allowed is %d rows.", maxRow, MAX_ROWS);
+            }
+            
+            return null; // Validation passed
+        } catch (Exception e) {
+            throw new IOException("Failed to validate Excel file dimensions: " + e.getMessage());
+        }
     }
 
 }
