@@ -31,7 +31,20 @@ public class NoteDaoImpl implements NoteDao {
 
     @Override
     public Note saveNote(Note note) {
-        return noteRepository.save(note);
+        try {
+            // Ensure visibleUserIds is not null for specific visibility types
+            if ((note.getVisibility() == Visibility.SPECIFIC_USERS || 
+                 note.getVisibility() == Visibility.SPECIFIC_ADMIN) && 
+                note.getVisibleUserIds() == null) {
+                note.setVisibleUserIds(new ArrayList<>());
+            }
+            
+            return noteRepository.save(note);
+        } catch (Exception e) {
+            System.err.println("Error saving note: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     @Override

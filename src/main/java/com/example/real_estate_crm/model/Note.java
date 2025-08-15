@@ -23,6 +23,7 @@ public class Note {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
     private Long userId; // ID of the user who created the note
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -30,12 +31,13 @@ public class Note {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Company company;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
     private LocalDateTime dateTime; // Scheduled date and time
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
     private Visibility visibility;
 
     @ElementCollection
@@ -44,9 +46,11 @@ public class Note {
     private List<Long> visibleUserIds;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 15)
     private Status status; // NEW status field
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 15)
     private Priority priority; // ✅ New priority field
 
     private LocalDateTime createdAt;

@@ -70,13 +70,14 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         // Allow specific origins
-        config.setAllowedOrigins(List.of(
+        config.setAllowedOriginPatterns(List.of(
                 "https://leadstracker.in",
                 "https://www.leadstracker.in",
                 "https://crm.leadstracker.in",
                 "https://test.leadstracker.in",
-                "http://localhost:5173",
-                "http://192.168.1.26:5173"));
+                "http://localhost:*",
+                "http://192.168.1.26:*",
+                "file://*")); // Support for local HTML files
 
         // Allow all HTTP methods
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
