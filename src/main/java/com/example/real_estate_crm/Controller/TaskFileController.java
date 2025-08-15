@@ -33,6 +33,13 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/task-files")
+@CrossOrigin(origins = {
+    "https://leadstracker.in",
+    "https://www.leadstracker.in", 
+    "https://crm.leadstracker.in",
+    "https://test.leadstracker.in",
+    "http://localhost:5173"
+}, allowCredentials = "true")
 @RequiredArgsConstructor
 public class TaskFileController {
 
