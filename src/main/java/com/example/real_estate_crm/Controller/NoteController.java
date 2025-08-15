@@ -51,11 +51,44 @@ public class NoteController {
     // CREATE NOTE
     @PostMapping
     public ResponseEntity<Note> addNote(@PathVariable Long companyId, @RequestBody Note note) {
-        Optional<Company> companyOpt = companyRepository.findById(companyId);
-        if (companyOpt.isEmpty()) return ResponseEntity.badRequest().build();
+        try {
+            // Validate company exists
+            Optional<Company> companyOpt = companyRepository.findById(companyId);
+            if (companyOpt.isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
 
-        note.setCompany(companyOpt.get());
-        Note savedNote = noteDao.saveNote(note);
+            // Validate required fields
+            if (note.getUserId() == null) {
+                return ResponseEntity.badRequest().build();
+            }
+            
+            if (note.getContent() == null || note.getContent().trim().isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
+            
+            if (note.getVisibility() == null) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            // Validate specific visibility requirements
+            if ((note.getVisibility() == Visibility.SPECIFIC_USERS || 
+                 note.getVisibility() == Visibility.SPECIFIC_ADMIN) && 
+                (note.getVisibleUserIds() == null || note.getVisibleUserIds().isEmpty())) {
+                System.err.println("Validation failed: SPECIFIC visibility requires visibleUserIds");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            // Debug logging
+            System.out.println("Creating note with visibility: " + note.getVisibility());
+            System.out.println("User ID: " + note.getUserId());
+            System.out.println("Company ID: " + companyId);
+            System.out.println("Content length: " + (note.getContent() != null ? note.getContent().length() : 0));
+            System.out.println("Visible User IDs: " + note.getVisibleUserIds());
+
+            // Set company and save
+            note.setCompany(companyOpt.get());
+            Note savedNote = noteDao.saveNote(note);
 
         String username = userService.findUsernameByUserId(note.getUserId()).orElse("Unknown User");
 
@@ -135,7 +168,13 @@ public class NoteController {
                 }
             }
         }
-        return ResponseEntity.ok(savedNote);
+            return ResponseEntity.ok(savedNote);
+        } catch (Exception e) {
+            // Log the error for debugging
+            System.err.println("Error creating note: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     // ✅ ONLY THIS METHOD RETAINED
@@ -441,6 +480,162 @@ public class NoteController {
         Note note = noteOpt.get();
         if (!note.getCompany().getId().equals(companyId)) return ResponseEntity.badRequest().build();
         return ResponseEntity.ok(note.getVisibility() == Visibility.SPECIFIC_USERS ? note.getVisibleUserIds() : List.of());
+    }
+
+    /**
+     * Get today's events for dashboard - optimized for dashboard loading
+     */
+    @GetMapping("/dashboard/today-events")
+    public ResponseEntity<List<Note>> getTodayEventsForDashboard(
+            @PathVariable Long companyId,
+            @RequestParam Long userId,
+            @RequestParam String role) {
+        
+        try {
+            LocalDate today = LocalDate.now();
+            List<Note> todayEvents = new ArrayList<>();
+            
+            switch (role.toUpperCase()) {
+                case "ADMIN":
+                    // Get notes from assigned users
+                    List<User> assignedUsers = userRepository.findByCompanyIdAndAdmin_UserId(companyId, userId);
+                    List<Long> assignedUserIds = assignedUsers.stream().map(User::getUserId).toList();
+                    
+                    if (!assignedUserIds.isEmpty()) {
+                        List<Visibility> visibilities = List.of(Visibility.ALL_USERS, Visibility.ME_AND_ADMIN);
+                        todayEvents.addAll(noteRepository.findAllByCompany_IdAndVisibilityInAndUserIdIn(
+                                companyId, visibilities, assignedUserIds
+                        ));
+                    }
+                    
+                    // Get ALL_ADMIN notes
+                    todayEvents.addAll(noteRepository.findAllByCompany_IdAndVisibility(
+                            companyId, Visibility.ALL_ADMIN
+                    ));
+                    
+                    // Get SPECIFIC_ADMIN notes visible to this admin
+                    todayEvents.addAll(noteRepository.findAllByCompany_IdAndVisibilityAndVisibleUserIdsContaining(
+                            companyId, Visibility.SPECIFIC_ADMIN, userId
+                    ));
+                    
+                    // Get director notes that admins should see
+                    List<User> directors = userRepository.findByCompanyIdAndRole(companyId, User.Role.DIRECTOR);
+                    List<Long> directorIds = directors.stream().map(User::getUserId).toList();
+                    
+                    if (!directorIds.isEmpty()) {
+                        List<Visibility> directorVisibilities = List.of(
+                                Visibility.ALL_USERS, 
+                                Visibility.ME_AND_ADMIN, 
+                                Visibility.ALL_ADMIN, 
+                                Visibility.ME_AND_DIRECTOR
+                        );
+                        todayEvents.addAll(noteRepository.findAllByCompany_IdAndVisibilityInAndUserIdIn(
+                                companyId, directorVisibilities, directorIds
+                        ));
+                    }
+                    break;
+                    
+                case "DIRECTOR":
+                    // Directors see all notes in the company
+                    todayEvents.addAll(noteRepository.findNotesVisibleToDirector(companyId, userId, true));
+                    break;
+                    
+                case "USER":
+                default:
+                    // Users see their own notes and notes visible to them
+                    todayEvents.addAll(noteRepository.findByUserIdAndCompany_Id(userId, companyId));
+                    todayEvents.addAll(noteRepository.findAllByCompany_IdAndVisibility(companyId, Visibility.ALL_USERS));
+                    todayEvents.addAll(noteRepository.findAllByCompany_IdAndVisibilityAndVisibleUserIdsContaining(
+                            companyId, Visibility.SPECIFIC_USERS, userId
+                    ));
+                    break;
+            }
+            
+            // Filter for today's events only and exclude completed/closed
+            List<Note> filteredTodayEvents = todayEvents.stream()
+                    .filter(note -> note.getDateTime() != null && 
+                            note.getStatus() != Status.COMPLETED &&
+                     
+                            note.getDateTime().toLocalDate().equals(today))
+                    .distinct()
+                    .sorted((a, b) -> a.getDateTime().compareTo(b.getDateTime()))
+                    .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(filteredTodayEvents);
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    // Validation endpoint to check database and company
+    @GetMapping("/validate")
+    public ResponseEntity<?> validateCompanyAndDatabase(@PathVariable Long companyId) {
+        try {
+            Map<String, Object> validation = new HashMap<>();
+            
+            // Check company exists
+            Optional<Company> companyOpt = companyRepository.findById(companyId);
+            validation.put("companyExists", companyOpt.isPresent());
+            
+            if (companyOpt.isPresent()) {
+                Company company = companyOpt.get();
+                validation.put("companyId", company.getId());
+                validation.put("companyName", company.getName());
+                
+                // Check users in company
+                List<User> users = userRepository.findByCompany_Id(companyId);
+                validation.put("totalUsers", users.size());
+                
+                List<User> admins = userRepository.findByCompanyIdAndRole(companyId, User.Role.ADMIN);
+                validation.put("totalAdmins", admins.size());
+                
+                // Check existing notes
+                List<Note> existingNotes = noteRepository.findByCompany_Id(companyId);
+                validation.put("existingNotes", existingNotes.size());
+                
+                // Test visibility enum values
+                validation.put("availableVisibilities", Arrays.asList(Visibility.values()));
+            }
+            
+            return ResponseEntity.ok(validation);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            error.put("stackTrace", Arrays.toString(e.getStackTrace()));
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    // Test endpoint for debugging note creation
+    @PostMapping("/test")
+    public ResponseEntity<?> testNoteCreation(@PathVariable Long companyId, @RequestBody Note note) {
+        try {
+            Map<String, Object> debugInfo = new HashMap<>();
+            debugInfo.put("companyId", companyId);
+            debugInfo.put("noteUserId", note.getUserId());
+            debugInfo.put("noteContent", note.getContent());
+            debugInfo.put("noteVisibility", note.getVisibility());
+            debugInfo.put("visibleUserIds", note.getVisibleUserIds());
+            debugInfo.put("dateTime", note.getDateTime());
+            debugInfo.put("priority", note.getPriority());
+            debugInfo.put("status", note.getStatus());
+            
+            // Check if company exists
+            Optional<Company> companyOpt = companyRepository.findById(companyId);
+            debugInfo.put("companyExists", companyOpt.isPresent());
+            
+            if (companyOpt.isPresent()) {
+                debugInfo.put("companyName", companyOpt.get().getName());
+            }
+            
+            return ResponseEntity.ok(debugInfo);
+        } catch (Exception e) {
+            Map<String, Object> errorInfo = new HashMap<>();
+            errorInfo.put("error", e.getMessage());
+            errorInfo.put("stackTrace", e.getStackTrace());
+            return ResponseEntity.internalServerError().body(errorInfo);
+        }
     }
 
     @GetMapping("/all/{userId}")

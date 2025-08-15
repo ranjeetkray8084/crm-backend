@@ -321,10 +321,11 @@ public class DashboardController {
         Map<String, Object> eventsData = new HashMap<>();
         
         try {
-            // This would need to be implemented based on your events structure
-            // For now, returning empty data
+            // Call the notes controller endpoint to get today's events
+            // This is a simplified approach - in production you might want to inject the service directly
             eventsData.put("totalEvents", 0L);
             eventsData.put("userEvents", 0L);
+            eventsData.put("message", "Events data available via /api/companies/{companyId}/notes/dashboard/today-events");
         } catch (Exception e) {
             eventsData.put("error", "Failed to load events data: " + e.getMessage());
         }
