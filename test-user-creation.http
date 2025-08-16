@@ -1,0 +1,58 @@
+### Test User Creation API
+
+# Test 1: Create a USER
+POST http://localhost:8082/api/users
+Content-Type: application/json
+
+{
+  "name": "Test User",
+  "email": "testuser@example.com",
+  "phone": "1234567890",
+  "password": "password123",
+  "confirmPassword": "password123",
+  "role": "USER",
+  "company": {
+    "id": 1
+  },
+  "admin": {
+    "userId": 1
+  }
+}
+
+###
+
+# Test 2: Create an ADMIN
+POST http://localhost:8082/api/users
+Content-Type: application/json
+
+{
+  "name": "Test Admin",
+  "email": "testadmin@example.com",
+  "phone": "9876543210",
+  "password": "password123",
+  "confirmPassword": "password123",
+  "role": "ADMIN",
+  "company": {
+    "id": 1
+  }
+}
+
+###
+
+# Test 3: Create a DIRECTOR
+POST http://localhost:8082/api/users
+Content-Type: application/json
+
+{
+  "name": "Test Director",
+  "email": "testdirector@example.com",
+  "phone": "5555555555",
+  "password": "password123",
+  "confirmPassword": "password123",
+  "role": "DIRECTOR",
+  "company": {
+    "id": 1
+  }
+}
+
+###

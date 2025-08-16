@@ -1,10 +1,12 @@
 package com.example.real_estate_crm.Controller;
 
 import com.example.real_estate_crm.dto.UserDTO;
+import com.example.real_estate_crm.dto.CreateUserRequest;
 import com.example.real_estate_crm.model.Company;
 import com.example.real_estate_crm.model.User;
 import com.example.real_estate_crm.model.UserAvatar;
 import com.example.real_estate_crm.model.User.Role;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.real_estate_crm.repository.UserRepository;
 import com.example.real_estate_crm.security.JwtUtil;
 import com.example.real_estate_crm.service.dao.UserAvatarDao;
@@ -101,60 +103,93 @@ public class UserController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createUser(@RequestBody User user) {
+    public ResponseEntity<?> createUser(@RequestBody Map<String, Object> requestMap) {
         try {
-            // Null check safely
-            if (user.getCompany() == null) {
-                return ResponseEntity.badRequest().body("Company is required");
+            // Convert Map to User object manually to avoid JSON deserialization issues
+            User user = new User();
+            
+            // Set basic fields
+            if (requestMap.containsKey("name")) {
+                user.setName((String) requestMap.get("name"));
             }
-
-            if (user.getCompany().getId() == null) {
+            if (requestMap.containsKey("email")) {
+                user.setEmail((String) requestMap.get("email"));
+            }
+            if (requestMap.containsKey("phone")) {
+                user.setPhone((String) requestMap.get("phone"));
+            }
+            if (requestMap.containsKey("password")) {
+                user.setPassword((String) requestMap.get("password"));
+            }
+            if (requestMap.containsKey("role")) {
+                String roleStr = (String) requestMap.get("role");
+                user.setRole(Role.valueOf(roleStr));
+            }
+            
+            // Handle company
+            Long companyId = null;
+            if (requestMap.containsKey("company")) {
+                Map<String, Object> companyMap = (Map<String, Object>) requestMap.get("company");
+                if (companyMap.containsKey("id")) {
+                    companyId = Long.valueOf(companyMap.get("id").toString());
+                }
+            }
+            
+            if (companyId == null) {
                 return ResponseEntity.badRequest().body("Company ID is required");
             }
-
-            // Step 2: Check if company exists
-            Optional<Company> optionalCompany = Optional.ofNullable(userDao.findCompanyById(user.getCompany().getId()));
+            
+            // Check if company exists
+            Optional<Company> optionalCompany = Optional.ofNullable(userDao.findCompanyById(companyId));
             if (optionalCompany.isEmpty()) {
                 return ResponseEntity.badRequest().body("Invalid company ID");
             }
-
+            
             Company company = optionalCompany.get();
-
-            // Step 3: Limit checks
+            user.setCompany(company);
+            
+            // Handle admin assignment for USER role
+            if (user.getRole() == Role.USER && requestMap.containsKey("admin")) {
+                Map<String, Object> adminMap = (Map<String, Object>) requestMap.get("admin");
+                if (adminMap.containsKey("userId")) {
+                    Long adminId = Long.valueOf(adminMap.get("userId").toString());
+                    Optional<User> adminUser = userDao.findById(adminId);
+                    if (adminUser.isPresent() && adminUser.get().getRole() == Role.ADMIN) {
+                        user.setAdmin(adminUser.get());
+                    } else {
+                        return ResponseEntity.badRequest().body("Invalid admin ID or admin not found");
+                    }
+                }
+            }
+            
+            // Set default status
+            user.setStatus(true);
+            
+            // Limit checks
             long existingCount = userRepository.countByCompanyAndRole(company, user.getRole());
 
-            if (user.getRole() == Role.USER && company.getMaxUsers() != null
-                    && existingCount >= company.getMaxUsers()) {
-                return ResponseEntity.badRequest()
-                        .body("❌ User creation failed: Max user limit reached for this company.");
+            if (user.getRole() == Role.USER && company.getMaxUsers() != null && existingCount >= company.getMaxUsers()) {
+                return ResponseEntity.badRequest().body("❌ User creation failed: Max user limit reached for this company.");
             }
 
-            if (user.getRole() == Role.ADMIN && company.getMaxAdmins() != null
-                    && existingCount >= company.getMaxAdmins()) {
-                return ResponseEntity.badRequest()
-                        .body("❌ Admin creation failed: Max admin limit reached for this company.");
+            if (user.getRole() == Role.ADMIN && company.getMaxAdmins() != null && existingCount >= company.getMaxAdmins()) {
+                return ResponseEntity.badRequest().body("❌ Admin creation failed: Max admin limit reached for this company.");
             }
 
-            // Step 4: Save user
-            user.setCompany(company); // Just to be sure
+            // Save user
             User savedUser = userDao.save(user);
-
             return ResponseEntity.status(HttpStatus.CREATED).body(new UserDTO(savedUser));
 
         } catch (IllegalArgumentException e) {
-            // Handle specific validation errors (email/phone duplicates)
-            String errorMessage = e.getMessage();
-            if (errorMessage.contains("Email already exists") || errorMessage.contains("Phone number already exists")) {
-                return ResponseEntity.badRequest().body("User already exists");
-            } else {
-                return ResponseEntity.badRequest().body("❌ " + errorMessage);
-            }
+            // Handle validation errors from UserDao
+            return ResponseEntity.badRequest().body("❌ " + e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(e.getMessage());
+            e.printStackTrace(); // For debug in logs
+            return ResponseEntity.badRequest().body("❌ Error creating user: " + e.getMessage());
         }
     }
 
+    
     @PutMapping("/update-profile/{id}")
     public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody User user, HttpServletResponse response) {
         Optional<User> optionalUser = userDao.findById(id);
