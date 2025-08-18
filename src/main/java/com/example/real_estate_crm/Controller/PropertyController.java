@@ -148,7 +148,8 @@ public class PropertyController {
         if (updatedProperty.getSource() != null) existingProperty.setSource(updatedProperty.getSource());
         if(updatedProperty.getLocation() != null) existingProperty.setLocation(updatedProperty.getLocation());
         if(updatedProperty.getFloor() != null) existingProperty.setFloor(updatedProperty.getFloor());
-        
+        if(updatedProperty.getSource() !=null) existingProperty.setSource(updatedProperty.getSource());
+        if(updatedProperty.getReferenceName() !=null) existingProperty.setReferenceName(updatedProperty.getReferenceName());
 
         Company company = new Company();
         company.setId(companyId);
