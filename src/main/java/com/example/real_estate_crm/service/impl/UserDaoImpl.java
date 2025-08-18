@@ -6,8 +6,9 @@ import java.util.Optional;
 import java.util.Random;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Repository;
 
@@ -16,6 +17,8 @@ import com.example.real_estate_crm.model.User;
 import com.example.real_estate_crm.repository.CompanyRepository;
 import com.example.real_estate_crm.repository.UserRepository;
 import com.example.real_estate_crm.service.dao.UserDao;
+
+import jakarta.mail.internet.MimeMessage;
 
 @Repository
 public class UserDaoImpl implements UserDao {
@@ -153,25 +156,61 @@ public class UserDaoImpl implements UserDao {
         user.setOtpExpiry(LocalDateTime.now().plusMinutes(5));
         userRepository.save(user);
 
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(email);
-        message.setSubject("🔐 Your OTP for Password Reset");
+        try {
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "UTF-8");
 
-        String content = String.format("""
-                Hi %s,
+            // ✅ RFC 5322 required headers
+            helper.setFrom("support@smartprocares.com", "SmartProCare Support"); 
+            helper.setTo(email);
+            helper.setSubject("🔐 Your OTP for Password Reset");
+            helper.setReplyTo("support@smartprocares.com");
 
-                We received a request to reset your password.
+            // ✅ HTML email template
+         // ✅ HTML email template (Dark CRM theme)
+            String content = """
+                <html>
+                  <body style="font-family: Arial, sans-serif; line-height: 1.6; background-color: #1e1e2f; color: #ffffff; padding: 20px; border-radius: 8px;">
+                    <div style="max-width: 600px; margin: auto; background-color: #2b2b3c; padding: 20px; border-radius: 10px;">
+                      
+                      <h2 style="color: #4cafef; text-align: center;">Hello %s,</h2>
+                      <p style="font-size: 15px; color: #dddddd;">We received a request to reset your password.</p>
+                      
+                      <p style="font-size: 16px; margin-top: 20px;">
+                        👉 <strong>Your One-Time Password (OTP) is:</strong><br/>
+                        <span style="display: inline-block; margin-top: 10px; font-size: 22px; color: #ff6b6b; background: #1e1e2f; padding: 10px 20px; border-radius: 6px; font-weight: bold;">
+                          %s
+                        </span>
+                      </p>
 
-                👉 Your One-Time Password (OTP) is: %s
+                      <p style="margin-top: 20px; font-size: 14px; color: #bbbbbb;">
+                        This OTP is valid for <strong>5 minutes</strong>. Please do not share it with anyone.
+                      </p>
 
-                This OTP is valid for 5 minutes. Please do not share it with anyone.
+                      <p style="font-size: 14px; color: #999999; margin-top: 30px;">
+                        If you did not request a password reset, you can ignore this message.
+                      </p>
 
-                If you did not request a password reset, you can ignore this message.
-                """, user.getName(), otp);
+                      <hr style="margin: 30px 0; border: 0; border-top: 1px solid #444;" />
+                      
+                      <p style="font-size: 14px; color: #888; text-align: center;">
+                        Best regards,<br/>SmartProCare Team
+                      </p>
+                    </div>
+                  </body>
+                </html>
+            """.formatted(user.getName(), otp);
 
-        message.setText(content);
-        mailSender.send(message);
+
+            helper.setText(content, true); // true = HTML
+
+            mailSender.send(mimeMessage);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to send reset password email", e);
+        }
     }
+
 
     @Override
     public boolean verifyOtp(String email, String otp) {
