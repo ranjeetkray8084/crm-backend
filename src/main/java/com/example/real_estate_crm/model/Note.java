@@ -38,7 +38,7 @@ public class Note {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private Visibility visibility;
+    private Visibility visibility = Visibility.ONLY_ME; // Default value
 
     @ElementCollection
     @CollectionTable(name = "note_visible_users", joinColumns = @JoinColumn(name = "note_id"))
@@ -64,18 +64,23 @@ public class Note {
         if (this.priority == null) {
             this.priority = Priority.PRIORITY_B; // ✅ Default to PRIORITY_B
         }
+        if (this.visibility == null) {
+            this.visibility = Visibility.ONLY_ME; // Default visibility
+        }
     }
 
-    public enum Visibility {
-        ONLY_ME,
-        ME_AND_ADMIN,
-        ALL_USERS,
-        SPECIFIC_USERS,
-        ME_AND_DIRECTOR,   // ✅ New
-        SPECIFIC_ADMIN,    // ✅ New
-        ALL_ADMIN          // ✅ New
-    }
-
+ 
+        public enum Visibility {
+            ALL_ADMIN,
+            ALL_USERS,
+            ME_AND_ADMIN,
+            ME_AND_DIRECTOR,
+            ONLY_ME,
+            SPECIFIC_ADMIN,
+            SPECIFIC_USERS
+        }
+        
+    
 
     public enum Status {
         NEW,
