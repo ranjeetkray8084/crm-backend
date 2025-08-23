@@ -72,9 +72,10 @@ public class UserDaoImpl implements UserDao {
             throw new IllegalArgumentException("Company is required");
         }
 
-        if (user.getRole() == User.Role.USER && user.getAdmin() == null) {
-            throw new IllegalArgumentException("Admin must be assigned for USER role");
-        }
+        // Admin assignment is now optional for USER role
+        // if (user.getRole() == User.Role.USER && user.getAdmin() == null) {
+        //     throw new IllegalArgumentException("Admin must be assigned for USER role");
+        // }
 
         return userRepository.save(user);
     }
