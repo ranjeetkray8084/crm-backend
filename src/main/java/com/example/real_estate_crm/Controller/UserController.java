@@ -150,23 +150,27 @@ public class UserController {
             
             // Handle admin assignment for USER role
             if (user.getRole() == Role.USER && requestMap.containsKey("admin")) {
-                Map<String, Object> adminMap = (Map<String, Object>) requestMap.get("admin");
-                if (adminMap.containsKey("userId")) {
-                    Long adminId = Long.valueOf(adminMap.get("userId").toString());
-                    Optional<User> adminUser = userDao.findById(adminId);
-                    if (adminUser.isPresent() && adminUser.get().getRole() == Role.ADMIN) {
-                        user.setAdmin(adminUser.get());
-                    } else {
-                        return ResponseEntity.badRequest().body("Invalid admin ID or admin not found");
+                Object adminObj = requestMap.get("admin");
+                if (adminObj != null && adminObj instanceof Map) {
+                    Map<String, Object> adminMap = (Map<String, Object>) adminObj;
+                    if (adminMap.containsKey("userId")) {
+                        Long adminId = Long.valueOf(adminMap.get("userId").toString());
+                        Optional<User> adminUser = userDao.findById(adminId);
+                        if (adminUser.isPresent() && adminUser.get().getRole() == Role.ADMIN) {
+                            user.setAdmin(adminUser.get());
+                        } else {
+                            return ResponseEntity.badRequest().body("Invalid admin ID or admin not found");
+                        }
                     }
                 }
+                // If admin is null or not a valid map, user will be created without admin assignment
             }
             
             // Set default status
             user.setStatus(true);
             
-            // Limit checks
-            long existingCount = userRepository.countByCompanyAndRole(company, user.getRole());
+            // Limit checks - using company ID instead of company object to avoid JOIN issues
+            long existingCount = userRepository.countByCompany_IdAndRole(companyId, user.getRole());
 
             if (user.getRole() == Role.USER && company.getMaxUsers() != null && existingCount >= company.getMaxUsers()) {
                 return ResponseEntity.badRequest().body("❌ User creation failed: Max user limit reached for this company.");
