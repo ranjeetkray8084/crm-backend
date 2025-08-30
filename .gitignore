@@ -1,3 +1,13 @@
+# ===== Firebase Credentials =====
+src/main/resources/firebase-service-account.json
+src/main/resources/firebase-*.json
+*.json.key
+
+# ===== Environment Files =====
+.env
+.env.local
+.env.production
+
 HELP.md
 target/
 !.mvn/wrapper/maven-wrapper.jar
