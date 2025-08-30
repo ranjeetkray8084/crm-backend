@@ -1,0 +1,50 @@
+### Test Push Notification Service Status
+GET http://localhost:8082/api/push-notifications/status
+Authorization: Bearer {{auth_token}}
+
+### Test Regular Push Notification
+POST http://localhost:8082/api/push-notifications/test
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "pushToken": "{{fcm_token}}",
+  "deviceType": "android"
+}
+
+### Test FCM Push Notification (Debug)
+POST http://localhost:8082/api/push-notifications/test-fcm
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "pushToken": "{{fcm_token}}",
+  "deviceType": "android"
+}
+
+### Register Push Token
+POST http://localhost:8082/api/push-notifications/register
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+
+{
+  "pushToken": "{{fcm_token}}",
+  "deviceType": "android"
+}
+
+### Get User's Push Tokens
+GET http://localhost:8082/api/push-notifications/tokens
+Authorization: Bearer {{auth_token}}
+
+### 🔔 Test Automatic Notification with Push (NEW!)
+POST http://localhost:8082/api/notifications/test-with-push?targetUserId=1&companyId=1&message=🧪 Test notification with automatic push!
+Authorization: Bearer {{auth_token}}
+
+# This will:
+# 1. Create an in-app notification
+# 2. Automatically send push notification to all user devices
+# 3. Both will have the exact same message
+
+### Variables (set these in your environment)
+# @auth_token = your_jwt_token_here
+# @fcm_token = your_fcm_token_here

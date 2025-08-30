@@ -76,7 +76,7 @@ public class SecurityConfig {
                 "https://crm.leadstracker.in",
                 "https://test.leadstracker.in",
                 "http://localhost:*",
-                "http://192.168.1.26:*",
+                "http://backend.leadstracker.in:*",
                 "file://*")); // Support for local HTML files
 
         // Allow all HTTP methods
