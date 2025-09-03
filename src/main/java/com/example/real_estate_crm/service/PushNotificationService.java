@@ -119,12 +119,14 @@ public class PushNotificationService {
      * Detect if token is FCM token
      */
     private boolean isFCMToken(String token) {
-        // FCM tokens typically start with specific patterns
-        return token != null && (
-            token.startsWith("d_") || // Expo FCM tokens
-            token.startsWith("fMEP") || // Firebase FCM tokens
-            token.length() > 100 // FCM tokens are usually longer
-        );
+        if (token == null) return false;
+        
+        // FCM tokens typically start with specific patterns or are longer
+        return token.startsWith("d_") || // Expo FCM tokens
+               token.startsWith("fMEP") || // Firebase FCM tokens
+               token.startsWith("cpKFluBIRYi") || // Known working FCM token pattern
+               token.contains(":APA91b") || // FCM token pattern
+               token.length() > 100; // FCM tokens are usually longer
     }
 
     /**
@@ -180,16 +182,55 @@ public class PushNotificationService {
         try {
             log.info("📱 Sending Expo notification to token: {}...", pushToken.substring(0, Math.min(20, pushToken.length())));
             
-            // This would require implementing HTTP client to Expo Push Service
-            // For now, just log that we're falling back to Expo
-            log.info("📱 Expo notification fallback - token: {}...", pushToken.substring(0, Math.min(20, pushToken.length())));
+            // Create Expo push notification payload
+            Map<String, Object> expoPayload = Map.of(
+                "to", pushToken,
+                "title", title,
+                "body", body,
+                "data", data != null ? data : Map.of(),
+                "sound", "default",
+                "badge", 1
+            );
             
-            // TODO: Implement Expo Push Service HTTP client
-            return false;
+            // Send to Expo Push Service
+            String response = sendHttpRequest(EXPO_PUSH_URL, expoPayload);
+            
+            if (response != null && response.contains("\"status\":\"ok\"")) {
+                log.info("✅ Expo notification sent successfully");
+                return true;
+            } else {
+                log.error("❌ Expo notification failed: {}", response);
+                return false;
+            }
             
         } catch (Exception e) {
             log.error("❌ Error sending Expo notification: {}", e.getMessage(), e);
             return false;
+        }
+    }
+    
+    /**
+     * Send HTTP request to Expo Push Service
+     */
+    private String sendHttpRequest(String url, Map<String, Object> payload) {
+        try {
+            java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+            java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                .uri(java.net.URI.create(url))
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                .build();
+            
+            java.net.http.HttpResponse<String> response = client.send(request, 
+                java.net.http.HttpResponse.BodyHandlers.ofString());
+            
+            log.info("📱 Expo Push Service response: {}", response.body());
+            return response.body();
+            
+        } catch (Exception e) {
+            log.error("❌ HTTP request failed: {}", e.getMessage(), e);
+            return null;
         }
     }
 
