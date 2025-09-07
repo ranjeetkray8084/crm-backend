@@ -12,7 +12,6 @@ import java.time.LocalDateTime;
 public class AnnouncementRequest {
     private String title;
     private String message;
-    private String priority = "NORMAL";
     private LocalDateTime expiresAt;
     private Boolean sendPushNotification = true;
 }
