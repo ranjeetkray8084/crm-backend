@@ -14,7 +14,6 @@ public interface AnnouncementRepository extends JpaRepository<Announcement, Long
 
     List<Announcement> findByCompanyIdAndIsActiveTrueOrderByCreatedAtDesc(Long companyId);
     
-    List<Announcement> findByCompanyIdAndPriorityAndIsActiveTrueOrderByCreatedAtDesc(Long companyId, Announcement.Priority priority);
     
     @Query("SELECT a FROM Announcement a WHERE a.company.id = :companyId AND a.isActive = true AND (a.expiresAt IS NULL OR a.expiresAt > :now) ORDER BY a.createdAt DESC")
     List<Announcement> findActiveAnnouncementsByCompany(@Param("companyId") Long companyId, @Param("now") LocalDateTime now);

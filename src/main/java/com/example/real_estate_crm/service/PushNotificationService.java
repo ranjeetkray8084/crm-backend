@@ -54,20 +54,27 @@ public class PushNotificationService {
                 return;
             }
 
-            // Load service account credentials
-            InputStream serviceAccountStream = new ClassPathResource(serviceAccountPath.replace("classpath:", "")).getInputStream();
-            GoogleCredentials credentials = GoogleCredentials.fromStream(serviceAccountStream);
+            // Check if Firebase is already initialized
+            if (FirebaseApp.getApps().isEmpty()) {
+                // Load service account credentials
+                InputStream serviceAccountStream = new ClassPathResource(serviceAccountPath.replace("classpath:", "")).getInputStream();
+                GoogleCredentials credentials = GoogleCredentials.fromStream(serviceAccountStream);
+                
+                // Initialize Firebase Admin SDK
+                FirebaseOptions options = FirebaseOptions.builder()
+                    .setCredentials(credentials)
+                    .setProjectId(firebaseProjectId)
+                    .build();
+                
+                firebaseApp = FirebaseApp.initializeApp(options);
+                log.info("✅ Firebase Admin SDK initialized successfully for project: {}", firebaseProjectId);
+            } else {
+                // Use existing Firebase app
+                firebaseApp = FirebaseApp.getInstance();
+                log.info("✅ Using existing Firebase Admin SDK instance for project: {}", firebaseProjectId);
+            }
             
-            // Initialize Firebase Admin SDK
-            FirebaseOptions options = FirebaseOptions.builder()
-                .setCredentials(credentials)
-                .setProjectId(firebaseProjectId)
-                .build();
-            
-            firebaseApp = FirebaseApp.initializeApp(options);
             firebaseMessaging = FirebaseMessaging.getInstance(firebaseApp);
-            
-            log.info("✅ Firebase Admin SDK initialized successfully for project: {}", firebaseProjectId);
             
         } catch (IOException e) {
             log.error("❌ Failed to initialize Firebase Admin SDK: {}", e.getMessage(), e);

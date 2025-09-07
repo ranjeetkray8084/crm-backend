@@ -33,6 +33,15 @@ public class PushToken {
     @Column(name = "device_type", length = 20)
     private String deviceType; // "android", "ios", "web"
 
+    @Column(name = "device_id", length = 100)
+    private String deviceId;
+
+    @Column(name = "device_name", length = 100)
+    private String deviceName;
+
+    @Column(name = "platform", length = 20)
+    private String platform;
+
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 

@@ -72,9 +72,9 @@ public class NotificationService {
                     // Send to ALL devices of the user (not just first one)
                     for (var pushToken : pushTokens) {
                         try {
-                            // Use the exact same message for both title and body to ensure consistency
-                            String title = message; // Full message as title
-                            String body = message;  // Full message as body
+                            // Set proper title and body to avoid duplication
+                            String title = "LeadsTracker"; // App name as title
+                            String body = message;  // Full message as body only
                             
                             pushNotificationService.sendPushNotification(
                                 pushToken.getPushToken(),
