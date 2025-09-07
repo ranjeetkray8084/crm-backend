@@ -23,8 +23,11 @@ public class Announcement {
     @Column(name = "title", nullable = false, length = 255)
     private String title;
 
-    @Column(name = "message", nullable = false, columnDefinition = "TEXT")
-    private String message;
+    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
+    private String content;
+
+    @Column(name = "image_url")
+    private String imageUrl;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id", nullable = false)
@@ -33,10 +36,6 @@ public class Announcement {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "priority", length = 20)
-    private Priority priority = Priority.NORMAL;
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
@@ -61,10 +60,4 @@ public class Announcement {
         this.updatedAt = ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime();
     }
 
-    public enum Priority {
-        LOW,
-        NORMAL,
-        HIGH,
-        URGENT
-    }
 }

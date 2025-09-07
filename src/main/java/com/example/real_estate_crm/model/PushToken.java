@@ -24,6 +24,9 @@ public class PushToken {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Column(name = "user_id", nullable = false, insertable = false, updatable = false)
+    private Long userId;
+
     @Column(name = "push_token", nullable = false, length = 500)
     private String pushToken;
 

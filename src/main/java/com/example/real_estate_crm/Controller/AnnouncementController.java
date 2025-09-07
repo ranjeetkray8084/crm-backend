@@ -1,15 +1,19 @@
 package com.example.real_estate_crm.Controller;
 
 import com.example.real_estate_crm.dto.AnnouncementRequest;
+import com.example.real_estate_crm.dto.DeveloperAnnouncementRequest;
 import com.example.real_estate_crm.model.Announcement;
 import com.example.real_estate_crm.model.Company;
 import com.example.real_estate_crm.model.User;
 import com.example.real_estate_crm.repository.AnnouncementRepository;
+import com.example.real_estate_crm.repository.CompanyRepository;
 import com.example.real_estate_crm.service.PushNotificationService;
+import com.example.real_estate_crm.service.SimplePushNotificationService;
 import com.example.real_estate_crm.service.PushTokenService;
 import com.example.real_estate_crm.service.dao.UserDao;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +21,8 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,8 +33,10 @@ import java.util.Map;
 public class AnnouncementController {
 
     private final AnnouncementRepository announcementRepository;
+    private final CompanyRepository companyRepository;
     private final PushTokenService pushTokenService;
     private final PushNotificationService pushNotificationService;
+    private final SimplePushNotificationService simplePushNotificationService;
     private final UserDao userDao;
 
     /**
@@ -36,51 +44,107 @@ public class AnnouncementController {
      */
     @PostMapping
     public ResponseEntity<?> createAnnouncement(
-            @RequestBody AnnouncementRequest request,
+            @RequestBody DeveloperAnnouncementRequest request,
             Authentication authentication) {
         try {
             User currentUser = userDao.findByEmail(authentication.getName()).orElseThrow(() -> new RuntimeException("User not found"));
-            Company company = currentUser.getCompany();
+            
+            // Validate developer role
+            if (!currentUser.getRole().equals(User.Role.DEVELOPER)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Only developers can create announcements"));
+            }
             
             // Create announcement
             Announcement announcement = new Announcement();
-            announcement.setTitle(request.getTitle());
-            announcement.setMessage(request.getMessage());
-            announcement.setCompany(company);
+            
+            // Generate title from content (first 60 characters)
+            String title = request.getContent().length() > 60 ? 
+                request.getContent().substring(0, 60) + "..." : 
+                request.getContent();
+            announcement.setTitle(title);
+            
+            announcement.setContent(request.getContent());
+            announcement.setImageUrl(request.getImageUrl());
             announcement.setCreatedBy(currentUser);
-            announcement.setPriority(Announcement.Priority.valueOf(request.getPriority()));
-            announcement.setExpiresAt(request.getExpiresAt());
+            
+            // Set company based on scope
+            Company company = null;
+            if ("ONE_COMPANY".equals(request.getScope())) {
+                company = companyRepository.findById(request.getCompanyId()).orElse(null);
+            } else if ("SPECIFIC_COMPANIES".equals(request.getScope()) && request.getCompanyIds() != null && !request.getCompanyIds().isEmpty()) {
+                // For multiple companies, we'll create separate announcements
+                company = companyRepository.findById(request.getCompanyIds().get(0)).orElse(null);
+            } else {
+                // ALL_COMPANIES - use current user's company as default
+                company = currentUser.getCompany();
+            }
+            
+            if (company == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid company selection"));
+            }
+            
+            announcement.setCompany(company);
+            
+            // Set 24-hour expiry
+            announcement.setExpiresAt(ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).plusHours(24).toLocalDateTime());
             announcement.setIsActive(true);
-            announcement.setCreatedAt(ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime());
-            announcement.setUpdatedAt(announcement.getCreatedAt());
             
             Announcement savedAnnouncement = announcementRepository.save(announcement);
             
-            // 🔒 SECURITY FIX: Company-wide push notifications are NOT allowed
-            // Only send to specific users or use regular notification system
-            if (request.getSendPushNotification()) {
-                log.warn("⚠️ Company-wide push notifications are not allowed for security reasons. Use regular notifications instead.");
+            // Send push notifications based on scope and audience
+            try {
+                String pushMessage = "New Announcement: " + title;
+                Map<String, String> pushData = new HashMap<>();
+                pushData.put("type", "announcement");
+                pushData.put("announcementId", savedAnnouncement.getId().toString());
                 
-                // Instead of company-wide push, send regular notifications to company users
-                // This ensures company isolation and proper notification tracking
-                try {
-                    // Get company users and send regular notifications (which automatically include push notifications)
-                    // This maintains company isolation and proper user targeting
-                    log.info("🔔 Sending company announcement via regular notification system for company: {}", company.getId());
+                if ("ALL_COMPANIES".equals(request.getScope())) {
+                    // Send to all users in all companies
+                    if ("ALL_USERS".equals(request.getAudience())) {
+                        // Send to all users
+                        simplePushNotificationService.sendNotificationToAllUsers(pushMessage, pushData);
+                    } else {
+                        // Send to directors only
+                        // Get all users and filter directors
+                        List<User> allUsers = userDao.getAllUsers();
+                        for (User user : allUsers) {
+                            if (user.getRole().equals(User.Role.DIRECTOR) && user.getStatus().equals("ACTIVE")) {
+                                simplePushNotificationService.sendNotificationToUser(user.getUserId(), pushMessage, pushData);
+                            }
+                        }
+                    }
+                } else {
+                    // Send to specific company/companies
+                    List<Long> targetCompanyIds = new ArrayList<>();
+                    if ("ONE_COMPANY".equals(request.getScope())) {
+                        targetCompanyIds.add(request.getCompanyId());
+                    } else if ("SPECIFIC_COMPANIES".equals(request.getScope())) {
+                        targetCompanyIds = request.getCompanyIds();
+                    }
                     
-                    // Note: Regular notifications automatically send push notifications to company users
-                    // This maintains security and company isolation
-                    
-                } catch (Exception e) {
-                    log.error("❌ Failed to send announcement notifications: {}", e.getMessage());
+                    for (Long companyId : targetCompanyIds) {
+                        List<User> companyUsers = userDao.findUsersByCompanyId(companyId);
+                        for (User user : companyUsers) {
+                            if (user.getStatus().equals("ACTIVE")) {
+                                if ("ALL_USERS".equals(request.getAudience()) || 
+                                    ("DIRECTOR_ONLY".equals(request.getAudience()) && user.getRole().equals(User.Role.DIRECTOR))) {
+                                    simplePushNotificationService.sendNotificationToUser(user.getUserId(), pushMessage, pushData);
+                                }
+                            }
+                        }
+                    }
                 }
+                
+                log.info("🔔 Push notifications sent for announcement: {}", savedAnnouncement.getId());
+                    
+            } catch (Exception e) {
+                log.error("❌ Failed to send announcement notifications: {}", e.getMessage());
             }
             
-            log.info("✅ Announcement created: {}", savedAnnouncement.getTitle());
             return ResponseEntity.ok(Map.of(
+                "success", true,
                 "message", "Announcement created successfully",
-                "announcement", savedAnnouncement,
-                "note", "Company-wide push notifications are not allowed for security. Use regular notifications instead."
+                "announcement", savedAnnouncement
             ));
         } catch (Exception e) {
             log.error("❌ Failed to create announcement: {}", e.getMessage(), e);
@@ -145,8 +209,7 @@ public class AnnouncementController {
             
             // Update fields
             announcement.setTitle(request.getTitle());
-            announcement.setMessage(request.getMessage());
-            announcement.setPriority(Announcement.Priority.valueOf(request.getPriority()));
+            announcement.setContent(request.getMessage());
             announcement.setExpiresAt(request.getExpiresAt());
             announcement.setUpdatedAt(ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime());
             
@@ -193,25 +256,4 @@ public class AnnouncementController {
         }
     }
 
-    /**
-     * Get announcements by priority
-     */
-    @GetMapping("/priority/{priority}")
-    public ResponseEntity<?> getAnnouncementsByPriority(
-            @PathVariable String priority,
-            Authentication authentication) {
-        try {
-            User currentUser = userDao.findByEmail(authentication.getName()).orElseThrow(() -> new RuntimeException("User not found"));
-            Company company = currentUser.getCompany();
-            
-            Announcement.Priority priorityEnum = Announcement.Priority.valueOf(priority.toUpperCase());
-            List<Announcement> announcements = announcementRepository.findByCompanyIdAndPriorityAndIsActiveTrueOrderByCreatedAtDesc(
-                company.getId(), priorityEnum);
-            
-            return ResponseEntity.ok(Map.of("announcements", announcements));
-        } catch (Exception e) {
-            log.error("❌ Failed to get announcements by priority {}: {}", priority, e.getMessage(), e);
-            return ResponseEntity.badRequest().body(Map.of("error", "Failed to get announcements by priority"));
-        }
-    }
 }
