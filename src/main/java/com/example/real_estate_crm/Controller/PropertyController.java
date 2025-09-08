@@ -109,6 +109,22 @@ public class PropertyController {
                         System.out.println("🔔 DEBUG: Sending notification to director...");
                         notificationService.sendNotification(director.getUserId(), company, message);
                         System.out.println("🔔 DEBUG: Director notification sent successfully");
+                        
+                        // 🔔 BONUS: Also notify all other directors if there are multiple
+                        try {
+                            var allDirectors = userRepository.findByCompanyIdAndRole(company.getId(), User.Role.DIRECTOR);
+                            if (allDirectors.size() > 1) {
+                                System.out.println("🔔 DEBUG: Found " + allDirectors.size() + " directors, notifying all of them");
+                                for (User otherDirector : allDirectors) {
+                                    if (!otherDirector.getUserId().equals(director.getUserId())) {
+                                        System.out.println("🔔 DEBUG: Also notifying director: " + otherDirector.getName() + " (ID: " + otherDirector.getUserId() + ")");
+                                        notificationService.sendNotification(otherDirector.getUserId(), company, message);
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            System.err.println("❌ DEBUG: Failed to notify additional directors: " + e.getMessage());
+                        }
                     } else {
                         System.out.println("🔔 DEBUG: No director found for company " + company.getId());
                     }
@@ -133,6 +149,22 @@ public class PropertyController {
                         System.out.println("🔔 DEBUG: Sending notification to director...");
                         notificationService.sendNotification(director.getUserId(), company, message);
                         System.out.println("🔔 DEBUG: Director notification sent successfully");
+                        
+                        // 🔔 BONUS: Also notify all other directors if there are multiple
+                        try {
+                            var allDirectors = userRepository.findByCompanyIdAndRole(company.getId(), User.Role.DIRECTOR);
+                            if (allDirectors.size() > 1) {
+                                System.out.println("🔔 DEBUG: Found " + allDirectors.size() + " directors, notifying all of them");
+                                for (User otherDirector : allDirectors) {
+                                    if (!otherDirector.getUserId().equals(director.getUserId())) {
+                                        System.out.println("🔔 DEBUG: Also notifying director: " + otherDirector.getName() + " (ID: " + otherDirector.getUserId() + ")");
+                                        notificationService.sendNotification(otherDirector.getUserId(), company, message);
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            System.err.println("❌ DEBUG: Failed to notify additional directors: " + e.getMessage());
+                        }
                     } else {
                         System.out.println("🔔 DEBUG: No director found for company " + company.getId());
                     }
