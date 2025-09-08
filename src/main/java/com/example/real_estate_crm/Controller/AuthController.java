@@ -2,6 +2,7 @@ package com.example.real_estate_crm.Controller;
 
 import com.example.real_estate_crm.model.User;
 import com.example.real_estate_crm.model.UserAvatar;
+import com.example.real_estate_crm.repository.PushTokenRepository;
 import com.example.real_estate_crm.repository.UserAvatarRepository;
 import com.example.real_estate_crm.repository.UserRepository;
 import com.example.real_estate_crm.security.JwtUtil;
@@ -40,6 +41,9 @@ public class AuthController {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private PushTokenRepository pushTokenRepository;
 
     // ✅ Login Endpoint
     @PostMapping("/login")
@@ -140,7 +144,31 @@ public class AuthController {
 
     // ✅ Logout and clear cookies
     @GetMapping("/logout")
-    public ResponseEntity<?> logout(HttpServletResponse response) {
+    public ResponseEntity<?> logout(HttpServletResponse response, @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        try {
+            // 🔔 Deactivate push tokens if user is authenticated
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                try {
+                    String token = authHeader.substring(7);
+                    String userEmail = jwtUtil.extractEmail(token);
+                    
+                    if (userEmail != null && !jwtUtil.isTokenExpired(token) && jwtUtil.isTokenValid(token)) {
+                        Optional<User> userOpt = userRepository.findByEmail(userEmail);
+                        if (userOpt.isPresent()) {
+                            User user = userOpt.get();
+                            int deactivatedTokens = pushTokenRepository.deactivateByUserId(user.getUserId());
+                            System.out.println("🔔 LOGOUT: Deactivated " + deactivatedTokens + " push tokens for user: " + user.getEmail());
+                        }
+                    }
+                } catch (Exception e) {
+                    System.err.println("⚠️ LOGOUT: Failed to deactivate push tokens: " + e.getMessage());
+                    // Don't fail logout if push token deactivation fails
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ LOGOUT: Error during push token cleanup: " + e.getMessage());
+        }
+
         ResponseCookie deleteCookie = ResponseCookie.from("accessToken", "")
                 .httpOnly(true)
                 .secure(true)
