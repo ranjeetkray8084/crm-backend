@@ -127,6 +127,7 @@ public class AnnouncementController {
             announcement.setTitle(title);
             
             announcement.setMessage(request.getContent());
+            announcement.setContent(request.getContent());
             announcement.setImageUrl(request.getImageUrl());
             announcement.setCreatedBy(currentUser);
             
@@ -294,6 +295,7 @@ public class AnnouncementController {
             // Update fields
             announcement.setTitle(request.getTitle());
             announcement.setMessage(request.getMessage());
+            announcement.setContent(request.getMessage()); // Set content same as message
             announcement.setExpiresAt(request.getExpiresAt());
             announcement.setUpdatedAt(ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime());
             

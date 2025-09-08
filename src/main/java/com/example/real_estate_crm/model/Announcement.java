@@ -26,6 +26,9 @@ public class Announcement {
     @Column(name = "message", nullable = false, columnDefinition = "TEXT")
     private String message;
 
+    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
+    private String content;
+
     @Column(name = "image_url")
     private String imageUrl;
 
