@@ -146,6 +146,8 @@ public class LeadController {
                         System.out.println("🔔 DEBUG: Admin notification sent successfully");
                     } else {
                         System.out.println("🔔 DEBUG: Creator has no admin assigned");
+                        System.out.println("🔔 DEBUG: Creator admin field: " + creator.getAdmin());
+                        System.out.println("🔔 DEBUG: Creator details - Name: " + creator.getName() + ", ID: " + creator.getUserId() + ", Role: " + creator.getRole());
                     }
 
                 } else if (creator.getRole() == User.Role.ADMIN) {

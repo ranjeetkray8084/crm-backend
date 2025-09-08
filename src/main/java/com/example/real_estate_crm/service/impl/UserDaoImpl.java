@@ -84,8 +84,23 @@ public class UserDaoImpl implements UserDao {
     @Override
     public User findDirectorByCompany(Company company) {
         try {
-            return userRepository.findByCompanyAndRole(company, User.Role.DIRECTOR);
+            System.out.println("🔔 DEBUG: UserDaoImpl.findDirectorByCompany called for company: " + company.getId());
+            User director = userRepository.findByCompanyAndRole(company, User.Role.DIRECTOR);
+            if (director != null) {
+                System.out.println("🔔 DEBUG: Found director: " + director.getName() + " (ID: " + director.getUserId() + ")");
+            } else {
+                System.out.println("🔔 DEBUG: No director found for company " + company.getId());
+                // Let's also check what users exist in this company
+                var allUsers = userRepository.findByCompany_Id(company.getId());
+                System.out.println("🔔 DEBUG: Total users in company " + company.getId() + ": " + allUsers.size());
+                for (var user : allUsers) {
+                    System.out.println("🔔 DEBUG: User: " + user.getName() + " (Role: " + user.getRole() + ", ID: " + user.getUserId() + ")");
+                }
+            }
+            return director;
         } catch (Exception e) {
+            System.err.println("❌ DEBUG: Exception in findDirectorByCompany: " + e.getMessage());
+            e.printStackTrace();
             return null;
         }
     }
