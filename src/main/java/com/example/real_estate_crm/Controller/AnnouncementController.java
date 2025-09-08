@@ -77,7 +77,7 @@ public class AnnouncementController {
             String filename = "announcement_" + UUID.randomUUID().toString() + extension;
             
             // Create uploads directory if it doesn't exist
-            Path uploadsDir = Paths.get("uploads");
+            Path uploadsDir = Paths.get("AnnouncementImages");
             if (!Files.exists(uploadsDir)) {
                 Files.createDirectories(uploadsDir);
             }
