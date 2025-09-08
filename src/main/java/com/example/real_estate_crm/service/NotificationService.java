@@ -38,17 +38,11 @@ public class NotificationService {
 
     // Send notification directly to a user (required by controller)
     public void sendNotification(Long userId, Company company, String message) {
-        System.out.println("🔔 DEBUG: NotificationService.sendNotification called");
-        System.out.println("🔔 DEBUG: userId: " + userId + ", companyId: " + company.getId() + ", message: " + message);
-        
         User user = userRepository.findById(userId).orElse(null);
         if (user == null) {
             System.err.println("❌ User not found with ID: " + userId);
             return;
         }
-        
-        System.out.println("🔔 DEBUG: Found user: " + user.getName() + " (Email: " + user.getEmail() + ")");
-        System.out.println("🔔 DEBUG: User company ID: " + user.getCompany().getId() + ", Requested company ID: " + company.getId());
 
         // 🔒 SECURITY FIX: Company validation to prevent cross-company notifications
         if (!user.getCompany().getId().equals(company.getId())) {
@@ -56,11 +50,8 @@ public class NotificationService {
                              ") does not belong to company " + company.getId() + ". Notification blocked.");
             return;
         }
-        
-        System.out.println("🔔 DEBUG: Company validation passed, proceeding with notification creation");
 
         try {
-            System.out.println("🔔 DEBUG: Creating in-app notification...");
             // Create and save the in-app notification
             Notification notification = new Notification();
             notification.setUser(user);
@@ -70,14 +61,10 @@ public class NotificationService {
             notification.setCreatedAt(LocalDateTime.now());
             
             notificationRepository.save(notification);
-            System.out.println("🔔 DEBUG: In-app notification saved with ID: " + notification.getId());
             
             // 🔔 AUTOMATIC PUSH NOTIFICATION: Send push notification to ALL devices of this user
             try {
-                System.out.println("🔔 DEBUG: Checking for push tokens for user: " + user.getEmail());
                 var pushTokens = pushTokenService.getActivePushTokensByUser(user);
-                System.out.println("🔔 DEBUG: Found " + pushTokens.size() + " active push tokens");
-                
                 if (!pushTokens.isEmpty()) {
                     System.out.println("🔔 Sending push notification to user: " + user.getEmail() + " (Company: " + company.getId() + 
                                      ") with " + pushTokens.size() + " devices");
@@ -115,14 +102,10 @@ public class NotificationService {
             } catch (Exception pushError) {
                 // Log push notification error but don't fail the main notification
                 System.err.println("❌ Failed to send push notifications: " + pushError.getMessage());
-                pushError.printStackTrace();
             }
         } catch (Exception e) {
             System.err.println("❌ Failed to create notification: " + e.getMessage());
-            e.printStackTrace();
         }
-        
-        System.out.println("🔔 DEBUG: NotificationService.sendNotification completed");
     }
 
 

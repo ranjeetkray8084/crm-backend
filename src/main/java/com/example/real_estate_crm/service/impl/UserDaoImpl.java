@@ -84,37 +84,16 @@ public class UserDaoImpl implements UserDao {
     @Override
     public User findDirectorByCompany(Company company) {
         try {
-            System.out.println("🔔 DEBUG: UserDaoImpl.findDirectorByCompany called for company: " + company.getId());
-            
             // Use findByCompanyIdAndRole which returns a List instead of single result
             var directors = userRepository.findByCompanyIdAndRole(company.getId(), User.Role.DIRECTOR);
-            System.out.println("🔔 DEBUG: Found " + directors.size() + " directors in company " + company.getId());
             
             if (!directors.isEmpty()) {
                 // Return the first director (you can modify this logic as needed)
-                User director = directors.get(0);
-                System.out.println("🔔 DEBUG: Using director: " + director.getName() + " (ID: " + director.getUserId() + ")");
-                
-                // Log all directors for debugging
-                for (int i = 0; i < directors.size(); i++) {
-                    User d = directors.get(i);
-                    System.out.println("🔔 DEBUG: Director " + (i+1) + ": " + d.getName() + " (ID: " + d.getUserId() + ")");
-                }
-                
-                return director;
+                return directors.get(0);
             } else {
-                System.out.println("🔔 DEBUG: No directors found for company " + company.getId());
-                // Let's also check what users exist in this company
-                var allUsers = userRepository.findByCompany_Id(company.getId());
-                System.out.println("🔔 DEBUG: Total users in company " + company.getId() + ": " + allUsers.size());
-                for (var user : allUsers) {
-                    System.out.println("🔔 DEBUG: User: " + user.getName() + " (Role: " + user.getRole() + ", ID: " + user.getUserId() + ")");
-                }
                 return null;
             }
         } catch (Exception e) {
-            System.err.println("❌ DEBUG: Exception in findDirectorByCompany: " + e.getMessage());
-            e.printStackTrace();
             return null;
         }
     }
