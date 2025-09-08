@@ -119,24 +119,25 @@ public class LeadController {
                 String message = "📢 A new lead \"" + createdLead.getName() + "\" was created by " + creator.getName();
 
                 if (creator.getRole() == User.Role.USER) {
-                    // Notify admin if assigned
-                    if (creator.getAdmin() != null) {
-                        notificationService.sendNotification(creator.getAdmin().getUserId(), company, message);
-                    }
-
-                    // Notify director
+                    // USER created lead - always notify director first
                     User director = userService.findDirectorByCompany(company);
                     if (director != null) {
                         notificationService.sendNotification(director.getUserId(), company, message);
                     }
+                    
+                    // Also notify admin if user has admin assigned
+                    if (creator.getAdmin() != null) {
+                        notificationService.sendNotification(creator.getAdmin().getUserId(), company, message);
+                    }
 
                 } else if (creator.getRole() == User.Role.ADMIN) {
-                    // Notify director only
+                    // ADMIN created lead - notify director only
                     User director = userService.findDirectorByCompany(company);
                     if (director != null) {
                         notificationService.sendNotification(director.getUserId(), company, message);
                     }
                 }
+                // DIRECTOR created lead - no notifications sent (top level)
             } catch (Exception notificationEx) {
                 // Don't fail the entire operation if notification fails
             }
@@ -281,11 +282,11 @@ public class LeadController {
     }
 
     @PutMapping("/{leadId}/assign/{userId}")
-    public ResponseEntity<Lead> assignLead(
+    public ResponseEntity<?> assignLead(
             @PathVariable Long companyId,
             @PathVariable Long leadId,
             @PathVariable Long userId,
-            @RequestParam Long assignerId // 👈 Who is assigning
+            @RequestParam Long assignerId 
     ) {
         Optional<User> optionalAssigner = userService.findById(assignerId);
         Optional<User> optionalAssignedUser = userService.findById(userId);
@@ -303,28 +304,45 @@ public class LeadController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
         }
 
-        return leadService.assignLead(companyId, leadId, userId)
-                .map(lead -> {
-                    String assignerRole = assigner.getRole().name(); // ADMIN / DIRECTOR
-                    String assignerName = assigner.getName();
-                    String leadName = lead.getName();
+        // 🔍 Get the lead to check creator
+        Lead lead = leadService.getById(companyId, leadId);
+        if (lead == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
 
-                    // 📩 Notify assigned user
-                    String assignedMsg = "📌 Lead \"" + leadName + "\" has been assigned to you by "
-                            + assignerRole + " " + assignerName;
-                    notificationService.sendNotification(assignedUser.getUserId(), lead.getCompany(), assignedMsg);
+        // 🚫 Prevent self-assignment if user is the creator
+        String message = "You cannot assign this lead";
+        User creator = lead.getCreatedBy();
+        if (creator != null && creator.getUserId().equals(userId)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(message); 
+        }
 
-                    // 📩 Notify creator if creator is a USER
-                    User creator = lead.getCreatedBy();
-                    if (creator != null && creator.getRole() == User.Role.USER) {
-                        String creatorMsg = "📋 Your lead \"" + leadName + "\" was assigned to "
-                                + assignedUser.getName() + " by " + assignerRole + " " + assignerName;
-                        notificationService.sendNotification(creator.getUserId(), lead.getCompany(), creatorMsg);
-                    }
+        // Assign the lead
+        Lead assignedLead = leadService.assignLead(companyId, leadId, userId).orElse(null);
+        if (assignedLead == null) {
+            return ResponseEntity.badRequest().build();
+        }
 
-                    return ResponseEntity.ok(lead);
-                })
-                .orElse(ResponseEntity.badRequest().build());
+        // Send notifications
+        String assignerRole = assigner.getRole().name(); // ADMIN / DIRECTOR
+        String assignerName = assigner.getName();
+        String leadName = assignedLead.getName();
+
+        // 📩 Notify assigned user
+        String assignedMsg = "📌 Lead \"" + leadName + "\" has been assigned to you by "
+                + assignerRole + " " + assignerName;
+        notificationService.sendNotification(assignedUser.getUserId(), assignedLead.getCompany(), assignedMsg);
+
+        // 📩 Notify creator if creator is a USER
+        User leadCreator = assignedLead.getCreatedBy();
+        if (leadCreator != null && leadCreator.getRole() == User.Role.USER) {
+            String creatorMsg = "📋 Your lead \"" + leadName + "\" was assigned to "
+                    + assignedUser.getName() + " by " + assignerRole + " " + assignerName;
+            notificationService.sendNotification(leadCreator.getUserId(), assignedLead.getCompany(), creatorMsg);
+        }
+
+        return ResponseEntity.ok(assignedLead);
     }
 
     @PutMapping("/{leadId}/unassign")

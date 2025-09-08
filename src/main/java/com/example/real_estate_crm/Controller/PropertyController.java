@@ -94,24 +94,25 @@ public class PropertyController {
                 String message = "📢 A new property \"" + created.getPropertyName() + "\" was created by " + creator.getName();
 
                 if (creator.getRole() == User.Role.USER) {
-                    // Notify creator's admin
-                    if (creator.getAdmin() != null) {
-                        notificationService.sendNotification(creator.getAdmin().getUserId(), company, message);
-                    }
-
-                    // Notify director of the company
+                    // USER created property - always notify director first
                     User director = userService.findDirectorByCompany(company);
                     if (director != null) {
                         notificationService.sendNotification(director.getUserId(), company, message);
                     }
+                    
+                    // Also notify admin if user has admin assigned
+                    if (creator.getAdmin() != null) {
+                        notificationService.sendNotification(creator.getAdmin().getUserId(), company, message);
+                    }
 
                 } else if (creator.getRole() == User.Role.ADMIN) {
-                    // Only notify director
+                    // ADMIN created property - notify director only
                     User director = userService.findDirectorByCompany(company);
                     if (director != null) {
                         notificationService.sendNotification(director.getUserId(), company, message);
                     }
                 }
+                // DIRECTOR created property - no notifications sent (top level)
             } catch (Exception notificationEx) {
                 // Don't fail the entire operation if notification fails
             }
