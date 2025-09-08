@@ -63,7 +63,7 @@ public class AnnouncementController {
                 request.getContent();
             announcement.setTitle(title);
             
-            announcement.setContent(request.getContent());
+            announcement.setMessage(request.getContent());
             announcement.setImageUrl(request.getImageUrl());
             announcement.setCreatedBy(currentUser);
             
@@ -209,7 +209,7 @@ public class AnnouncementController {
             
             // Update fields
             announcement.setTitle(request.getTitle());
-            announcement.setContent(request.getMessage());
+            announcement.setMessage(request.getMessage());
             announcement.setExpiresAt(request.getExpiresAt());
             announcement.setUpdatedAt(ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime());
             

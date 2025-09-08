@@ -23,8 +23,8 @@ public class Announcement {
     @Column(name = "title", nullable = false, length = 255)
     private String title;
 
-    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
-    private String content;
+    @Column(name = "message", nullable = false, columnDefinition = "TEXT")
+    private String message;
 
     @Column(name = "image_url")
     private String imageUrl;

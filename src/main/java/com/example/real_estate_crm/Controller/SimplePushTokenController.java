@@ -99,7 +99,7 @@ public class SimplePushTokenController {
     }
 
     @PostMapping("/send")
-    public ResponseEntity<Map<String, Object>> sendTestNotification(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<Map<String, Object>> sendNotificationToUser(@RequestBody Map<String, Object> request) {
         try {
             Long userId = Long.valueOf(request.get("userId").toString());
             String message = (String) request.get("message");
