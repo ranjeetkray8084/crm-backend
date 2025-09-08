@@ -91,29 +91,61 @@ public class PropertyController {
 
             // Notification Logic
             try {
+                System.out.println("🔔 DEBUG: Starting notification process for property creation");
+                System.out.println("🔔 DEBUG: Creator: " + creator.getName() + " (Role: " + creator.getRole() + ")");
+                System.out.println("🔔 DEBUG: Company: " + company.getId());
+                System.out.println("🔔 DEBUG: Property: " + created.getPropertyName());
+                
                 String message = "📢 A new property \"" + created.getPropertyName() + "\" was created by " + creator.getName();
+                System.out.println("🔔 DEBUG: Notification message: " + message);
 
                 if (creator.getRole() == User.Role.USER) {
+                    System.out.println("🔔 DEBUG: Creator is USER - checking for director and admin notifications");
+                    
                     // USER created property - always notify director first
                     User director = userService.findDirectorByCompany(company);
                     if (director != null) {
+                        System.out.println("🔔 DEBUG: Found director: " + director.getName() + " (ID: " + director.getUserId() + ")");
+                        System.out.println("🔔 DEBUG: Sending notification to director...");
                         notificationService.sendNotification(director.getUserId(), company, message);
+                        System.out.println("🔔 DEBUG: Director notification sent successfully");
+                    } else {
+                        System.out.println("🔔 DEBUG: No director found for company " + company.getId());
                     }
                     
                     // Also notify admin if user has admin assigned
                     if (creator.getAdmin() != null) {
+                        System.out.println("🔔 DEBUG: Creator has admin: " + creator.getAdmin().getName() + " (ID: " + creator.getAdmin().getUserId() + ")");
+                        System.out.println("🔔 DEBUG: Sending notification to admin...");
                         notificationService.sendNotification(creator.getAdmin().getUserId(), company, message);
+                        System.out.println("🔔 DEBUG: Admin notification sent successfully");
+                    } else {
+                        System.out.println("🔔 DEBUG: Creator has no admin assigned");
                     }
 
                 } else if (creator.getRole() == User.Role.ADMIN) {
+                    System.out.println("🔔 DEBUG: Creator is ADMIN - checking for director notification");
+                    
                     // ADMIN created property - notify director only
                     User director = userService.findDirectorByCompany(company);
                     if (director != null) {
+                        System.out.println("🔔 DEBUG: Found director: " + director.getName() + " (ID: " + director.getUserId() + ")");
+                        System.out.println("🔔 DEBUG: Sending notification to director...");
                         notificationService.sendNotification(director.getUserId(), company, message);
+                        System.out.println("🔔 DEBUG: Director notification sent successfully");
+                    } else {
+                        System.out.println("🔔 DEBUG: No director found for company " + company.getId());
                     }
+                } else if (creator.getRole() == User.Role.DIRECTOR) {
+                    System.out.println("🔔 DEBUG: Creator is DIRECTOR - no notifications sent (top level)");
+                } else {
+                    System.out.println("🔔 DEBUG: Unknown role: " + creator.getRole());
                 }
-                // DIRECTOR created property - no notifications sent (top level)
+                
+                System.out.println("🔔 DEBUG: Property creation notification process completed successfully");
             } catch (Exception notificationEx) {
+                System.err.println("❌ DEBUG: Notification failed for property creation: " + notificationEx.getMessage());
+                notificationEx.printStackTrace();
                 // Don't fail the entire operation if notification fails
             }
 
