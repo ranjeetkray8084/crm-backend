@@ -171,7 +171,7 @@ public class AnnouncementController {
                         // Send in-app notifications to all users
                         List<User> allUsers = userDao.getAllUsers();
                         for (User user : allUsers) {
-                            if (user.getStatus().equals("ACTIVE")) {
+                            if (user.getStatus() != null && user.getStatus()) {
                                 notificationService.sendNotification(user.getUserId(), user.getCompany(), 
                                     "📢 New announcement: " + title);
                             }
@@ -181,7 +181,7 @@ public class AnnouncementController {
                         // Get all users and filter directors
                         List<User> allUsers = userDao.getAllUsers();
                         for (User user : allUsers) {
-                            if (user.getRole().equals(User.Role.DIRECTOR) && user.getStatus().equals("ACTIVE")) {
+                            if (user.getRole().equals(User.Role.DIRECTOR) && user.getStatus() != null && user.getStatus()) {
                                 simplePushNotificationService.sendNotificationToUser(user.getUserId(), pushMessage, pushData);
                                 notificationService.sendNotification(user.getUserId(), user.getCompany(), 
                                     "📢 New announcement: " + title);
@@ -202,7 +202,7 @@ public class AnnouncementController {
                         Company targetCompany = companyRepository.findById(companyId).orElse(null);
                         
                         for (User user : companyUsers) {
-                            if (user.getStatus().equals("ACTIVE")) {
+                            if (user.getStatus() != null && user.getStatus()) {
                                 if ("ALL_USERS".equals(request.getAudience()) || 
                                     ("DIRECTOR_ONLY".equals(request.getAudience()) && user.getRole().equals(User.Role.DIRECTOR))) {
                                     
