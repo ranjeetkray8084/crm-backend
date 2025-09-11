@@ -43,7 +43,7 @@ public class PropertyDTO {
         dto.setType(property.getType());
         dto.setBhk(property.getBhk());
         dto.setSize(property.getSize());
-        dto.setOwnerName(property.getOwnerName());
+        dto.setOwnerName(hideSensitive ? "🔒 Hidden" : property.getOwnerName());
         dto.setOwnerContact(hideSensitive ? "🔒 Hidden" : property.getOwnerContact());
         dto.setPrice(property.getPrice());
         dto.setSector(property.getSector());
