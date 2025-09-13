@@ -614,5 +614,91 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 		    Pageable pageable
 		);
 
+	// Admin-specific two keywords search
+	@Query(value = """
+		    SELECT DISTINCT l.* FROM leads l
+		    LEFT JOIN users cby ON l.created_by = cby.user_id
+		    LEFT JOIN users ato ON l.assigned_to = ato.user_id
+		    WHERE l.company_id = :companyId
+		      AND l.status != 'DROPED'
+		      AND (
+		        l.created_by = :adminId
+		        OR cby.admin_id = :adminId
+		        OR ato.admin_id = :adminId
+		      )
+		      AND (
+		        LOWER(l.name) LIKE LOWER(CONCAT('%', :keyword1, '%'))
+		        OR LOWER(l.email) LIKE LOWER(CONCAT('%', :keyword1, '%'))
+		        OR LOWER(l.phone) LIKE LOWER(CONCAT('%', :keyword1, '%'))
+		        OR LOWER(l.requirement) LIKE LOWER(CONCAT('%', :keyword1, '%'))
+		        OR LOWER(l.location) LIKE LOWER(CONCAT('%', :keyword1, '%'))
+		        OR LOWER(l.reference_name) LIKE LOWER(CONCAT('%', :keyword1, '%'))
+		      )
+		      AND (
+		        LOWER(l.name) LIKE LOWER(CONCAT('%', :keyword2, '%'))
+		        OR LOWER(l.email) LIKE LOWER(CONCAT('%', :keyword2, '%'))
+		        OR LOWER(l.phone) LIKE LOWER(CONCAT('%', :keyword2, '%'))
+		        OR LOWER(l.requirement) LIKE LOWER(CONCAT('%', :keyword2, '%'))
+		        OR LOWER(l.location) LIKE LOWER(CONCAT('%', :keyword2, '%'))
+		        OR LOWER(l.reference_name) LIKE LOWER(CONCAT('%', :keyword2, '%'))
+		      )
+		      AND (:status IS NULL OR l.status = :status)
+		      AND (:minBudget IS NULL OR l.budget >= :minBudget)
+		      AND (:maxBudget IS NULL OR l.budget <= :maxBudget)
+		      AND (:createdBy IS NULL OR l.created_by = :createdBy)
+		      AND (:source IS NULL OR l.source = :source)
+		      AND (:action IS NULL OR l.action = :action)
+		    ORDER BY l.created_at DESC
+		    """,
+		    countQuery = """
+		    SELECT COUNT(DISTINCT l.lead_id) FROM leads l
+		    LEFT JOIN users cby ON l.created_by = cby.user_id
+		    LEFT JOIN users ato ON l.assigned_to = ato.user_id
+		    WHERE l.company_id = :companyId
+		      AND l.status != 'DROPED'
+		      AND (
+		        l.created_by = :adminId
+		        OR cby.admin_id = :adminId
+		        OR ato.admin_id = :adminId
+		      )
+		      AND (
+		        LOWER(l.name) LIKE LOWER(CONCAT('%', :keyword1, '%'))
+		        OR LOWER(l.email) LIKE LOWER(CONCAT('%', :keyword1, '%'))
+		        OR LOWER(l.phone) LIKE LOWER(CONCAT('%', :keyword1, '%'))
+		        OR LOWER(l.requirement) LIKE LOWER(CONCAT('%', :keyword1, '%'))
+		        OR LOWER(l.location) LIKE LOWER(CONCAT('%', :keyword1, '%'))
+		        OR LOWER(l.reference_name) LIKE LOWER(CONCAT('%', :keyword1, '%'))
+		      )
+		      AND (
+		        LOWER(l.name) LIKE LOWER(CONCAT('%', :keyword2, '%'))
+		        OR LOWER(l.email) LIKE LOWER(CONCAT('%', :keyword2, '%'))
+		        OR LOWER(l.phone) LIKE LOWER(CONCAT('%', :keyword2, '%'))
+		        OR LOWER(l.requirement) LIKE LOWER(CONCAT('%', :keyword2, '%'))
+		        OR LOWER(l.location) LIKE LOWER(CONCAT('%', :keyword2, '%'))
+		        OR LOWER(l.reference_name) LIKE LOWER(CONCAT('%', :keyword2, '%'))
+		      )
+		      AND (:status IS NULL OR l.status = :status)
+		      AND (:minBudget IS NULL OR l.budget >= :minBudget)
+		      AND (:maxBudget IS NULL OR l.budget <= :maxBudget)
+		      AND (:createdBy IS NULL OR l.created_by = :createdBy)
+		      AND (:source IS NULL OR l.source = :source)
+		      AND (:action IS NULL OR l.action = :action)
+		    """,
+		    nativeQuery = true
+		)
+		Page<Lead> searchLeadsVisibleToAdminWithTwoKeywords(
+		    @Param("companyId") Long companyId,
+		    @Param("adminId") Long adminId,
+		    @Param("keyword1") String keyword1,
+		    @Param("keyword2") String keyword2,
+		    @Param("status") String status,
+		    @Param("minBudget") BigDecimal minBudget,
+		    @Param("maxBudget") BigDecimal maxBudget,
+		    @Param("createdBy") Long createdBy,
+		    @Param("source") String source,
+		    @Param("action") String action,
+		    Pageable pageable
+		);
+
 	
 }
