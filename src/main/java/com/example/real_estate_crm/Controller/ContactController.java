@@ -19,7 +19,7 @@ public class ContactController {
         String subject = "New Contact Message from " + request.getName();
         String body = "You have received a new message:\n\n"
                     + "Name: " + request.getName() + "\n"
-                    +"Phone Number"+request.getNumber() + "\n"
+                    +"Phone Number: "+request.getNumber() + "\n"
                     + "Email: " + request.getEmail() + "\n\n"
                     + "Message:\n" + request.getMessage();
         emailService.sendContactMail("support@smartprocares.com", subject, body); 
