@@ -14,6 +14,7 @@ import com.example.real_estate_crm.model.Property.Status;
 import com.example.real_estate_crm.service.NotificationService;
 import com.example.real_estate_crm.service.dao.PropertyDao;
 import com.example.real_estate_crm.service.dao.UserDao;
+import com.example.real_estate_crm.security.JwtUtil;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -21,11 +22,25 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
+
+// Excel export imports
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,26 +51,32 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/companies/{companyId}/properties")
 public class PropertyController {
 
-    @Autowired
-    private PropertyDao propertyService;
+    private final PropertyDao propertyService;
+    private final NotificationService notificationService;
+    private final UserDao userService;
+    private final PropertyRemarkRepository propertyRemarkRepository;
+    private final PropertyRepository propertyRepository;
+    private final UserRepository userRepository;
+    private final CompanyRepository companyRepository;
+    private final JwtUtil jwtUtil;
 
-    @Autowired
-    private NotificationService notificationService;
-
-    @Autowired
-    private UserDao userService;
-
-    @Autowired
-    private PropertyRemarkRepository propertyRemarkRepository; // Assuming you have this injected
-
-    @Autowired
-    private PropertyRepository propertyRepository; // For remark validation
-   
-    @Autowired
-    private UserRepository userRepository;
-    
-    @Autowired
-    private CompanyRepository companyRepository;
+    public PropertyController(PropertyDao propertyService,
+                            NotificationService notificationService,
+                            UserDao userService,
+                            PropertyRemarkRepository propertyRemarkRepository,
+                            PropertyRepository propertyRepository,
+                            UserRepository userRepository,
+                            CompanyRepository companyRepository,
+                            JwtUtil jwtUtil) {
+        this.propertyService = propertyService;
+        this.notificationService = notificationService;
+        this.userService = userService;
+        this.propertyRemarkRepository = propertyRemarkRepository;
+        this.propertyRepository = propertyRepository;
+        this.userRepository = userRepository;
+        this.companyRepository = companyRepository;
+        this.jwtUtil = jwtUtil;
+    }
     
     @PostMapping
     public ResponseEntity<?> createProperty(@PathVariable Long companyId, @RequestBody Property property) {
@@ -504,11 +525,195 @@ public class PropertyController {
         return ResponseEntity.ok(response);
     }
 
-
+    // Excel Export Endpoint for Properties
+    @GetMapping("/export")
+    public ResponseEntity<Resource> exportPropertiesToExcel(
+            @PathVariable Long companyId,
+            @RequestParam(required = false) List<String> keywords,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Long createdBy,
+            @RequestParam(required = false) String userRole,
+            @RequestParam(required = false) Long userId,
+            HttpServletRequest request) {
+        
+        try {
+            // Authentication check
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ByteArrayResource("Missing or invalid authorization header".getBytes()));
+            }
+            
+            String token = authHeader.substring(7); // Remove "Bearer " prefix
+            if (!jwtUtil.isTokenValid(token) || jwtUtil.isTokenExpired(token)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ByteArrayResource("Invalid or expired token".getBytes()));
+            }
+            
+            // Get user from token
+            String email = jwtUtil.extractEmail(token);
+            User user = userRepository.findByEmail(email).orElse(null);
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ByteArrayResource("User not found".getBytes()));
+            }
+            // Fetch all properties data
+            List<Property> properties = propertyService.getAllProperties(companyId);
+            
+            if (properties.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new ByteArrayResource("No properties found for export".getBytes()));
+            }
+            
+            // Create Excel workbook
+            Workbook workbook = new XSSFWorkbook();
+            Sheet sheet = workbook.createSheet("Properties Export");
+            
+            // Create header row based on user role
+            Row headerRow = sheet.createRow(0);
+            int colNum = 0;
+            
+            // Define columns based on role (similar to frontend logic)
+            if ("DIRECTOR".equals(userRole)) {
+                String[] headers = {
+                    "Property Name", "Location", "Type", "Status", "Price", "Size", 
+                    "BHK", "Bathrooms", "Sector", "Created Date", "Created By", 
+                    "Unit Details", "Source", "Owner Contact", "Owner Name", "Floor", "Reference Name"
+                };
+                
+                for (String header : headers) {
+                    Cell cell = headerRow.createCell(colNum++);
+                    cell.setCellValue(header);
+                }
+            } else if ("ADMIN".equals(userRole)) {
+                String[] headers = {
+                    "Property Name", "Location", "Type", "Status", "Price", "Size", 
+                    "BHK", "Bathrooms", "Sector", "Created Date", "Created By", 
+                    "Unit Details", "Source", "Owner Contact", "Owner Name", "Floor", "Reference Name"
+                };
+                
+                for (String header : headers) {
+                    Cell cell = headerRow.createCell(colNum++);
+                    cell.setCellValue(header);
+                }
+            } else {
+                // Default USER role - hide sensitive information like PropertyDTO
+                String[] headers = {
+                    "Property Name", "Location", "Type", "Status", "Price", "Size", 
+                    "BHK", "Bathrooms", "Sector", "Created Date", "Unit Details", "Source", "Owner Contact", "Owner Name", "Floor", "Reference Name"
+                };
+                
+                for (String header : headers) {
+                    Cell cell = headerRow.createCell(colNum++);
+                    cell.setCellValue(header);
+                }
+            }
+            
+            // Add data rows
+            int rowNum = 1;
+            for (Property property : properties) {
+                Row row = sheet.createRow(rowNum++);
+                colNum = 0;
+                
+                // Format data similar to frontend
+                addCellValue(row, colNum++, property.getPropertyName());
+                addCellValue(row, colNum++, property.getLocation());
+                addCellValue(row, colNum++, property.getType());
+                addCellValue(row, colNum++, property.getStatus() != null ? property.getStatus().name() : "");
+                addCellValue(row, colNum++, property.getPrice() != null ? property.getPrice().toString() : "");
+                addCellValue(row, colNum++, property.getSize());
+                addCellValue(row, colNum++, property.getBhk());
+                addCellValue(row, colNum++, ""); // Bathrooms placeholder
+                addCellValue(row, colNum++, property.getSector());
+                addCellValue(row, colNum++, formatDate(property.getCreatedAt()));
+                
+                if ("DIRECTOR".equals(userRole) || "ADMIN".equals(userRole)) {
+                    addCellValue(row, colNum++, property.getCreatedBy() != null ? property.getCreatedBy().getName() : "");
+                }
+                
+                // Add unit details - hide for USER/ADMIN role unless created by same user
+                if ("USER".equals(userRole) || "ADMIN".equals(userRole)) {
+                    boolean isOwnProperty = property.getCreatedBy() != null && 
+                                          property.getCreatedBy().getUserId().equals(user.getUserId());
+                    addCellValue(row, colNum++, isOwnProperty ? property.getUnitDetails() : "🔒 Hidden");
+                } else {
+                    addCellValue(row, colNum++, property.getUnitDetails());
+                }
+                
+                addCellValue(row, colNum++, property.getSource());
+                
+                // Add owner contact - hide for USER/ADMIN role unless created by same user
+                if ("USER".equals(userRole) || "ADMIN".equals(userRole)) {
+                    boolean isOwnProperty = property.getCreatedBy() != null && 
+                                          property.getCreatedBy().getUserId().equals(user.getUserId());
+                    addCellValue(row, colNum++, isOwnProperty ? property.getOwnerContact() : "🔒 Hidden");
+                } else {
+                    addCellValue(row, colNum++, property.getOwnerContact());
+                }
+                
+                // Add owner name - hide for USER/ADMIN role unless created by same user
+                if ("USER".equals(userRole) || "ADMIN".equals(userRole)) {
+                    boolean isOwnProperty = property.getCreatedBy() != null && 
+                                          property.getCreatedBy().getUserId().equals(user.getUserId());
+                    addCellValue(row, colNum++, isOwnProperty ? property.getOwnerName() : "🔒 Hidden");
+                } else {
+                    addCellValue(row, colNum++, property.getOwnerName());
+                }
+                
+                // Add floor - hide for USER/ADMIN role unless created by same user
+                if ("USER".equals(userRole) || "ADMIN".equals(userRole)) {
+                    boolean isOwnProperty = property.getCreatedBy() != null && 
+                                          property.getCreatedBy().getUserId().equals(user.getUserId());
+                    addCellValue(row, colNum++, isOwnProperty ? property.getFloor() : "🔒 Hidden");
+                } else {
+                    addCellValue(row, colNum++, property.getFloor());
+                }
+                
+                // Add reference name - always visible
+                addCellValue(row, colNum++, property.getReferenceName());
+            }
+            
+            // Auto-size columns
+            for (int i = 0; i < colNum; i++) {
+                sheet.autoSizeColumn(i);
+            }
+            
+            // Convert to byte array
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            workbook.write(outputStream);
+            workbook.close();
+            
+            byte[] excelBytes = outputStream.toByteArray();
+            
+            // Create filename with timestamp
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            String filename = "properties_export_" + timestamp + ".xlsx";
+            
+            // Create resource
+            ByteArrayResource resource = new ByteArrayResource(excelBytes);
+            
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .contentLength(excelBytes.length)
+                    .body(resource);
+                    
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ByteArrayResource(("Export failed: " + e.getMessage()).getBytes()));
+        }
+    }
     
-   
-
-
-  
+    private void addCellValue(Row row, int colNum, String value) {
+        Cell cell = row.createCell(colNum);
+        cell.setCellValue(value != null ? value : "");
+    }
+    
+    private String formatDate(LocalDateTime dateTime) {
+        if (dateTime == null) return "";
+        return dateTime.format(DateTimeFormatter.ofPattern("dd MMM yyyy"));
+    }
 
 }

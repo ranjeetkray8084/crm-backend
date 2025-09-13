@@ -11,22 +11,34 @@ import com.example.real_estate_crm.repository.CompanyRepository;
 import com.example.real_estate_crm.service.NotificationService;
 import com.example.real_estate_crm.service.dao.LeadDao;
 import com.example.real_estate_crm.service.dao.UserDao;
+import com.example.real_estate_crm.security.JwtUtil;
+
+// Excel export imports
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -43,8 +55,8 @@ public class LeadController {
     private final LeadRemarkRepository leadRemarkRepository;
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
+    private final JwtUtil jwtUtil;
 
-    @Autowired
     public LeadController(
             LeadDao leadService,
             UserDao userService,
@@ -52,7 +64,8 @@ public class LeadController {
             LeadRepository leadRepository,
             LeadRemarkRepository leadRemarkRepository,
             UserRepository userRepository,
-            CompanyRepository companyRepository) {
+            CompanyRepository companyRepository,
+            JwtUtil jwtUtil) {
         this.leadService = leadService;
         this.userService = userService;
         this.notificationService = notificationService;
@@ -60,6 +73,7 @@ public class LeadController {
         this.leadRemarkRepository = leadRemarkRepository;
         this.userRepository = userRepository;
         this.companyRepository = companyRepository;
+        this.jwtUtil = jwtUtil;
     }
 
     @GetMapping
@@ -701,6 +715,207 @@ public class LeadController {
         }
 
         return ResponseEntity.ok(response);
+    }
+
+    // Excel Export Endpoint
+    @GetMapping("/export")
+    public ResponseEntity<Resource> exportLeadsToExcel(
+            @PathVariable Long companyId,
+            @RequestParam(required = false) List<String> keywords,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) BigDecimal minBudget,
+            @RequestParam(required = false) BigDecimal maxBudget,
+            @RequestParam(required = false) Long createdBy,
+            @RequestParam(required = false) String source,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String userRole,
+            @RequestParam(required = false) Long userId,
+            HttpServletRequest request) {
+        
+        try {
+            // Authentication check
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ByteArrayResource("Missing or invalid authorization header".getBytes()));
+            }
+            
+            String token = authHeader.substring(7); // Remove "Bearer " prefix
+            if (!jwtUtil.isTokenValid(token) || jwtUtil.isTokenExpired(token)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ByteArrayResource("Invalid or expired token".getBytes()));
+            }
+            
+            // Get user from token
+            String email = jwtUtil.extractEmail(token);
+            User user = userRepository.findByEmail(email).orElse(null);
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ByteArrayResource("User not found".getBytes()));
+            }
+            // Fetch leads data based on user role (similar to frontend logic)
+            Page<Lead> leadsPage;
+            
+            // For USER role, filter leads to only show assigned leads or leads created by user
+            if ("USER".equals(userRole)) {
+                // USER can only export leads assigned to them or created by them
+                // Use simple filtering: get leads assigned to user or created by user
+                Company company = user.getCompany();
+                List<Lead> assignedLeads = leadRepository.findByAssignedToUserIdAndCompany(user.getUserId(), company);
+                List<Lead> createdLeads = leadRepository.findByCreatorIdAndCompany(user.getUserId(), company);
+                
+                // Combine and remove duplicates
+                Set<Lead> uniqueLeads = new HashSet<>();
+                uniqueLeads.addAll(assignedLeads);
+                uniqueLeads.addAll(createdLeads);
+                
+                // Convert back to Page for consistency
+                leadsPage = new PageImpl<>(new ArrayList<>(uniqueLeads), PageRequest.of(0, 10000), uniqueLeads.size());
+            } else if ("ADMIN".equals(userRole)) {
+                // ADMIN can only export leads created by admin or assigned to admin + all assigned users under admin
+                if (keywords != null && keywords.size() >= 2) {
+                    leadsPage = leadRepository.searchLeadsVisibleToAdminWithTwoKeywords(companyId, user.getUserId(), keywords.get(0), keywords.get(1), status,
+                            minBudget, maxBudget, createdBy, source, action, PageRequest.of(0, 10000));
+                } else if (keywords != null && keywords.size() == 1) {
+                    leadsPage = leadRepository.searchLeadsVisibleToAdmin(companyId, user.getUserId(), createdBy, keywords.get(0), status, minBudget, maxBudget, source, action, PageRequest.of(0, 10000));
+                } else {
+                    leadsPage = leadRepository.getLeadsVisibleToAdmin(companyId, user.getUserId(), PageRequest.of(0, 10000));
+                }
+            } else {
+                // DIRECTOR can export all leads
+                if (keywords != null && keywords.size() >= 2) {
+                    leadsPage = leadRepository.searchLeadsWithTwoKeywords(companyId, keywords.get(0), keywords.get(1), status,
+                            minBudget, maxBudget, createdBy, source, action, PageRequest.of(0, 10000));
+                } else if (keywords != null && keywords.size() == 1) {
+                    leadsPage = leadService.searchLeads(companyId, keywords.get(0), status, minBudget, maxBudget, createdBy, source,
+                            action, PageRequest.of(0, 10000));
+                } else {
+                    leadsPage = leadService.searchLeads(companyId, null, status, minBudget, maxBudget, createdBy, source, action,
+                            PageRequest.of(0, 10000));
+                }
+            }
+            
+            List<Lead> leads = leadsPage.getContent();
+            
+            if (leads.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new ByteArrayResource("No leads found for export".getBytes()));
+            }
+            
+            // Create Excel workbook
+            Workbook workbook = new XSSFWorkbook();
+            Sheet sheet = workbook.createSheet("Leads Export");
+            
+            // Create header row based on user role
+            Row headerRow = sheet.createRow(0);
+            int colNum = 0;
+            
+            // Define columns based on role (similar to frontend logic)
+            if ("DIRECTOR".equals(userRole)) {
+                String[] headers = {
+                    "Lead Name", "Phone", "Email", "Status", "Budget", "Requirement", 
+                    "Location", "Source", "Created Date", "Assigned To", "Created By", 
+                    "Notes", "Follow Up Date", "Priority"
+                };
+                
+                for (String header : headers) {
+                    Cell cell = headerRow.createCell(colNum++);
+                    cell.setCellValue(header);
+                }
+            } else if ("ADMIN".equals(userRole)) {
+                String[] headers = {
+                    "Lead Name", "Phone", "Email", "Status", "Budget", "Requirement", 
+                    "Location", "Source", "Created Date", "Assigned To", "Created By", 
+                    "Notes", "Follow Up Date"
+                };
+                
+                for (String header : headers) {
+                    Cell cell = headerRow.createCell(colNum++);
+                    cell.setCellValue(header);
+                }
+            } else {
+                // Default USER role
+                String[] headers = {
+                    "Lead Name", "Phone", "Email", "Status", "Budget", "Requirement", 
+                    "Location", "Source", "Created Date", "Assigned To", "Notes", "Follow Up Date"
+                };
+                
+                for (String header : headers) {
+                    Cell cell = headerRow.createCell(colNum++);
+                    cell.setCellValue(header);
+                }
+            }
+            
+            // Add data rows
+            int rowNum = 1;
+            for (Lead lead : leads) {
+                Row row = sheet.createRow(rowNum++);
+                colNum = 0;
+                
+                // Format data similar to frontend
+                addCellValue(row, colNum++, lead.getName());
+                addCellValue(row, colNum++, lead.getPhone());
+                addCellValue(row, colNum++, lead.getEmail());
+                addCellValue(row, colNum++, lead.getStatus() != null ? lead.getStatus().name() : "");
+                addCellValue(row, colNum++, lead.getBudget() != null ? lead.getBudget().toString() : "");
+                addCellValue(row, colNum++, lead.getRequirement());
+                addCellValue(row, colNum++, lead.getLocation());
+                addCellValue(row, colNum++, lead.getSource() != null ? lead.getSource().name() : "");
+                addCellValue(row, colNum++, formatDate(lead.getCreatedAt()));
+                addCellValue(row, colNum++, lead.getAssignedTo() != null ? lead.getAssignedTo().getName() : "");
+                
+                if ("DIRECTOR".equals(userRole) || "ADMIN".equals(userRole)) {
+                    addCellValue(row, colNum++, lead.getCreatedBy() != null ? lead.getCreatedBy().getName() : "");
+                }
+                
+                // Add notes (simplified - you might want to fetch actual remarks)
+                addCellValue(row, colNum++, ""); // Notes placeholder
+                addCellValue(row, colNum++, ""); // Follow up date placeholder
+                
+                if ("DIRECTOR".equals(userRole)) {
+                    addCellValue(row, colNum++, ""); // Priority placeholder
+                }
+            }
+            
+            // Auto-size columns
+            for (int i = 0; i < colNum; i++) {
+                sheet.autoSizeColumn(i);
+            }
+            
+            // Convert to byte array
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            workbook.write(outputStream);
+            workbook.close();
+            
+            byte[] excelBytes = outputStream.toByteArray();
+            
+            // Create filename with timestamp
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            String filename = "leads_export_" + timestamp + ".xlsx";
+            
+            // Create resource
+            ByteArrayResource resource = new ByteArrayResource(excelBytes);
+            
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .contentLength(excelBytes.length)
+                    .body(resource);
+                    
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ByteArrayResource(("Export failed: " + e.getMessage()).getBytes()));
+        }
+    }
+    
+    private void addCellValue(Row row, int colNum, String value) {
+        Cell cell = row.createCell(colNum);
+        cell.setCellValue(value != null ? value : "");
+    }
+    
+    private String formatDate(LocalDateTime dateTime) {
+        if (dateTime == null) return "";
+        return dateTime.format(DateTimeFormatter.ofPattern("dd MMM yyyy"));
     }
 
 }
