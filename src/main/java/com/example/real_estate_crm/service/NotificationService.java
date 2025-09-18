@@ -2,10 +2,14 @@ package com.example.real_estate_crm.service;
 
 import com.example.real_estate_crm.model.Company;
 import com.example.real_estate_crm.model.FollowUp;
+import com.example.real_estate_crm.model.Lead;
 import com.example.real_estate_crm.model.Notification;
+import com.example.real_estate_crm.model.Property;
 import com.example.real_estate_crm.model.User;
 import com.example.real_estate_crm.repository.FollowUpRepository;
+import com.example.real_estate_crm.repository.LeadRepository;
 import com.example.real_estate_crm.repository.NotificationRepository;
+import com.example.real_estate_crm.repository.PropertyRepository;
 import com.example.real_estate_crm.repository.UserRepository;
 import com.example.real_estate_crm.service.PushNotificationService;
 import com.example.real_estate_crm.service.PushTokenService;
@@ -29,6 +33,12 @@ public class NotificationService {
     
     @Autowired
     private FollowUpRepository followUpRepository;
+    
+    @Autowired
+    private PropertyRepository propertyRepository;
+    
+    @Autowired
+    private LeadRepository leadRepository;
     
     @Autowired
     private PushTokenService pushTokenService;
@@ -218,6 +228,108 @@ public class NotificationService {
             
         } catch (Exception e) {
             // Log error but don't fail the operation
+        }
+    }
+
+    // Property reminder notifications - Send only on the scheduled day at 9 AM
+    @Scheduled(cron = "0 0 9 * * ?", zone = "Asia/Kolkata")
+    public void sendScheduledPropertyReminderNotifications() {
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime startOfDay = now.withHour(0).withMinute(0).withSecond(0).withNano(0);
+            LocalDateTime endOfDay = now.withHour(23).withMinute(59).withSecond(59).withNano(999_999_999);
+            
+            // Get properties with reminder dates for today
+            List<Property> propertiesWithReminders = propertyRepository.findByReminderDateBetween(
+                startOfDay, endOfDay
+            );
+            
+            if (propertiesWithReminders.isEmpty()) {
+                return;
+            }
+            
+            for (Property property : propertiesWithReminders) {
+                try {
+                    // Only send reminder if property has reminder date for today and status is RENT_OUT
+                    LocalDateTime reminderDate = property.getReminderDate();
+                    if (reminderDate != null && 
+                        reminderDate.toLocalDate().equals(now.toLocalDate()) &&
+                        property.getStatus() == Property.Status.RENT_OUT) {
+                        
+                        String timeStr = reminderDate.toLocalTime().toString();
+                        if (timeStr.length() > 5) {
+                            timeStr = timeStr.substring(0, 5);
+                        }
+                        
+                        String message = "🏠 Reminder: Property \"" + property.getPropertyName() + 
+                                       "\" (Rented Out) has a reminder scheduled for TODAY at " + timeStr;
+                        
+                        // 🔔 AUTOMATIC: Send reminder only to the user who created the property (will also send push notification)
+                        if (property.getCreatedBy() != null) {
+                            sendNotification(property.getCreatedBy().getUserId(), property.getCompany(), message);
+                        }
+                    }
+                    
+                } catch (Exception e) {
+                    // Continue processing other properties
+                    System.err.println("❌ Failed to send property reminder notification: " + e.getMessage());
+                }
+            }
+            
+        } catch (Exception e) {
+            // Log error but don't fail the operation
+            System.err.println("❌ Failed to process property reminder notifications: " + e.getMessage());
+        }
+    }
+
+    // Lead reminder notifications - Send only on the scheduled day at 9 AM
+    @Scheduled(cron = "0 0 9 * * ?", zone = "Asia/Kolkata")
+    public void sendScheduledLeadReminderNotifications() {
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime startOfDay = now.withHour(0).withMinute(0).withSecond(0).withNano(0);
+            LocalDateTime endOfDay = now.withHour(23).withMinute(59).withSecond(59).withNano(999_999_999);
+            
+            // Get leads with reminder dates for today
+            List<Lead> leadsWithReminders = leadRepository.findByReminderDateBetween(
+                startOfDay, endOfDay
+            );
+            
+            if (leadsWithReminders.isEmpty()) {
+                return;
+            }
+            
+            for (Lead lead : leadsWithReminders) {
+                try {
+                    // Only send reminder if lead has reminder date for today and status is CLOSED
+                    LocalDateTime reminderDate = lead.getReminderDate();
+                    if (reminderDate != null && 
+                        reminderDate.toLocalDate().equals(now.toLocalDate()) &&
+                        lead.getStatus() == Lead.LeadStatus.CLOSED) {
+                        
+                        String timeStr = reminderDate.toLocalTime().toString();
+                        if (timeStr.length() > 5) {
+                            timeStr = timeStr.substring(0, 5);
+                        }
+                        
+                        String message = "👤 Reminder: Lead \"" + lead.getName() + 
+                                       "\" (Closed) has a reminder scheduled for TODAY at " + timeStr;
+                        
+                        // 🔔 AUTOMATIC: Send reminder only to the user who created the lead (will also send push notification)
+                        if (lead.getCreatedBy() != null) {
+                            sendNotification(lead.getCreatedBy().getUserId(), lead.getCompany(), message);
+                        }
+                    }
+                    
+                } catch (Exception e) {
+                    // Continue processing other leads
+                    System.err.println("❌ Failed to send lead reminder notification: " + e.getMessage());
+                }
+            }
+            
+        } catch (Exception e) {
+            // Log error but don't fail the operation
+            System.err.println("❌ Failed to process lead reminder notifications: " + e.getMessage());
         }
     }
 }

@@ -72,6 +72,9 @@ public class Lead {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "status_change_date")
+    private LocalDateTime statusChangeDate;
+
     @Column(nullable = true)
     private String location;
 
@@ -83,6 +86,9 @@ public class Lead {
 
     @Column(columnDefinition = "TEXT")
     private String requirement;
+
+    @Column(name = "reminder_date")
+    private LocalDateTime reminderDate;
 
     @OneToMany(mappedBy = "lead", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
@@ -132,11 +138,20 @@ public class Lead {
         this.action = Action.UNASSIGNED;
     }
 
+    // Custom setter for status to automatically update statusChangeDate
+    public void setStatus(LeadStatus status) {
+        if (this.status != status) {
+            this.status = status;
+            this.statusChangeDate = ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime();
+        }
+    }
+
     @PrePersist
     public void prePersist() {
         LocalDateTime nowKolkata = ZonedDateTime.now(ZoneId.of("Asia/Kolkata")).toLocalDateTime();
         this.createdAt = nowKolkata;
         this.updatedAt = nowKolkata;
+        this.statusChangeDate = nowKolkata; // Initialize status change date when lead is created
     }
 
     @PreUpdate

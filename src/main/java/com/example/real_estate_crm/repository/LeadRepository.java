@@ -14,6 +14,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -700,5 +701,7 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 		    Pageable pageable
 		);
 
-	
+	// Method to find leads with reminder dates between given dates
+	List<Lead> findByReminderDateBetween(LocalDateTime startDate, LocalDateTime endDate);
+
 }

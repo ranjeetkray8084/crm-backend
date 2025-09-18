@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -46,6 +47,12 @@ public interface PropertyRepository extends JpaRepository<Property, Long>, JpaSp
 
     // Paginated fetch
     Page<Property> findByCompanyId(Long companyId, Pageable pageable);
+
+    // Find properties with reminder dates between two dates
+    List<Property> findByStatusAndReminderDateBetween(Property.Status status, LocalDateTime startDate, LocalDateTime endDate);
+    
+    // Find properties with reminder dates between two dates (for scheduled notifications)
+    List<Property> findByReminderDateBetween(LocalDateTime startDate, LocalDateTime endDate);
 
     // ✅ Count all properties (optional)
     @Query("SELECT COUNT(p) FROM Property p")
