@@ -918,4 +918,70 @@ public class LeadController {
         return dateTime.format(DateTimeFormatter.ofPattern("dd MMM yyyy"));
     }
 
+    @PostMapping("/{leadId}/set-reminder")
+    public ResponseEntity<?> setReminderForClosedLead(
+            @PathVariable Long companyId,
+            @PathVariable Long leadId,
+            @RequestBody Map<String, String> requestBody) {
+        
+        // Find the lead and check company match
+        Optional<Lead> optionalLead = leadRepository.findById(leadId);
+        if (optionalLead.isEmpty() || !optionalLead.get().getCompany().getId().equals(companyId)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Lead lead = optionalLead.get();
+        
+        // Check if lead status is CLOSED
+        if (lead.getStatus() != Lead.LeadStatus.CLOSED) {
+            return ResponseEntity.badRequest()
+                    .body("❌ Reminder can only be set for leads with 'CLOSED' status. Current status: " + lead.getStatus());
+        }
+
+        String reminderDateStr = requestBody.get("reminderDate");
+        System.out.println("🔍 Received reminder date for lead: " + reminderDateStr);
+        
+        if (reminderDateStr == null || reminderDateStr.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("❌ Reminder date is required");
+        }
+
+        try {
+            // Parse the reminder date (handle both ISO format and local format)
+            LocalDateTime reminderDate;
+            if (reminderDateStr.contains("T") && reminderDateStr.contains("Z")) {
+                // Handle ISO format: 2025-01-15T09:00:00.000Z
+                reminderDate = LocalDateTime.parse(reminderDateStr.replace("Z", ""));
+            } else {
+                // Handle local format: 2025-01-15T09:00:00
+                reminderDate = LocalDateTime.parse(reminderDateStr);
+            }
+            System.out.println("🔍 Parsed reminder date for lead: " + reminderDate);
+            
+            // Check if reminder date is in the future
+            if (reminderDate.isBefore(LocalDateTime.now())) {
+                return ResponseEntity.badRequest()
+                        .body("❌ Reminder date must be in the future");
+            }
+
+            // Set the reminder date
+            lead.setReminderDate(reminderDate);
+            System.out.println("🔍 Set reminder date on lead: " + lead.getName());
+            
+            Lead savedLead = leadRepository.save(lead);
+            System.out.println("🔍 Saved lead with reminder date: " + savedLead.getReminderDate());
+
+            // No immediate notification when setting reminder
+            // Notification will be sent on the reminder date by scheduled job
+
+            return ResponseEntity.ok(Map.of(
+                "message", "✅ Reminder set successfully for lead: " + lead.getName(),
+                "reminderDate", reminderDate.format(DateTimeFormatter.ofPattern("dd MMM yyyy 'at' HH:mm"))
+            ));
+            
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body("❌ Invalid date format. Please use format: yyyy-MM-dd'T'HH:mm:ss");
+        }
+    }
+
 }
