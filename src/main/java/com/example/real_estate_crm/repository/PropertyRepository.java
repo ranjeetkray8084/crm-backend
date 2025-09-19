@@ -68,4 +68,13 @@ public interface PropertyRepository extends JpaRepository<Property, Long>, JpaSp
 
     // ✅ Count by company and status
     long countByCompany_IdAndStatus(Long companyId, Property.Status status);
+
+    // Find properties by company excluding DROPPED status (paginated)
+    Page<Property> findByCompany_IdAndStatusNot(Long companyId, Property.Status status, Pageable pageable);
+
+    // Find properties by company excluding DROPPED status (non-paginated)
+    List<Property> findByCompany_IdAndStatusNot(Long companyId, Property.Status status);
+
+    // Count properties by company excluding DROPPED status
+    long countByCompany_IdAndStatusNot(Long companyId, Property.Status status);
 }

@@ -85,7 +85,7 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 		    SELECT l.lead_id, l.action, l.budget, l.created_at, l.created_by,
 		           l.email, l.name, l.phone, l.reference_name, l.requirement,
 		           l.source, l.status, l.updated_at, l.version,
-		           l.assigned_to, l.company_id, l.location
+		           l.assigned_to, l.company_id, l.location, l.status_change_date, l.reminder_date
 		    FROM leads l
 		    LEFT JOIN users cby ON l.created_by = cby.user_id
 		    LEFT JOIN users ato ON l.assigned_to = ato.user_id
@@ -160,7 +160,7 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 		    SELECT l.lead_id, l.action, l.budget, l.created_at, l.created_by,
 		           l.email, l.name, l.phone, l.reference_name, l.requirement,
 		           l.source, l.status, l.updated_at, l.version,
-		           l.assigned_to, l.company_id, l.location
+		           l.assigned_to, l.company_id, l.location, l.status_change_date, l.reminder_date
 		    FROM leads l
 		    LEFT JOIN users cby ON l.created_by = cby.user_id
 		    LEFT JOIN users ato ON l.assigned_to = ato.user_id
@@ -235,7 +235,7 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 		    SELECT l.lead_id, l.action, l.budget, l.created_at, l.created_by,
 		           l.email, l.name, l.phone, l.reference_name, l.requirement,
 		           l.source, l.status, l.updated_at, l.version,
-		           l.assigned_to, l.company_id, l.location
+		           l.assigned_to, l.company_id, l.location, l.status_change_date, l.reminder_date
 		    FROM leads l
 		    LEFT JOIN users cby ON l.created_by = cby.user_id
 		    LEFT JOIN users ato ON l.assigned_to = ato.user_id
@@ -518,7 +518,7 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 		    SELECT l.lead_id, l.action, l.budget, l.created_at, l.created_by,
 		           l.email, l.name, l.phone, l.reference_name, l.requirement,
 		           l.source, l.status, l.updated_at, l.version,
-		           l.assigned_to, l.company_id, l.location
+		           l.assigned_to, l.company_id, l.location, l.status_change_date, l.reminder_date
 		    FROM leads l
 		    LEFT JOIN users cby ON l.created_by = cby.user_id
 		    LEFT JOIN users ato ON l.assigned_to = ato.user_id

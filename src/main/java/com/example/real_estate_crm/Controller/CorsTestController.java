@@ -12,7 +12,7 @@ import java.util.Map;
     "https://leadstracker.in",
     "https://www.leadstracker.in", 
     "https://crm.leadstracker.in",
-    "https://test.leadstracker.in",
+    "https://backend.leadstracker.in",
     "http://localhost:5173"
 }, allowCredentials = "true")
 public class CorsTestController {

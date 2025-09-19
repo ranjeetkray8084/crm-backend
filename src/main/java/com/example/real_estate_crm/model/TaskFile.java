@@ -21,6 +21,8 @@ public class TaskFile {
 
     private String title; // Excel file ka naam + logical title (same)
 
+    private String purpose;
+
     @Column(name = "file_path")
     private String filePath; // Full file path saved on server
 

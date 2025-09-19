@@ -319,7 +319,8 @@ public class PropertyController {
         String role = currentUser.getRole().name();
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("propertyId").descending());
-        Page<Property> propertiesPage = propertyRepository.findByCompanyId(companyId, pageable);
+        // ✅ Exclude DROPPED status properties from main listing (same as Lead controller)
+        Page<Property> propertiesPage = propertyRepository.findByCompany_IdAndStatusNot(companyId, Property.Status.DROPPED, pageable);
 
         List<PropertyDTO> filteredProperties = propertiesPage.getContent().stream()
                 .map((Property property) -> {
@@ -602,6 +603,8 @@ public class PropertyController {
 
         long rent_out = propertyRepository.countByCompany_IdAndStatus(companyId, Property.Status.RENT_OUT);
         long sold_out= propertyRepository.countByCompany_IdAndStatus(companyId, Property.Status.SOLD_OUT);
+        long dropped = propertyRepository.countByCompany_IdAndStatus(companyId, Property.Status.DROPPED);
+        total = total - dropped;
 
         Map<String, Long> response = new HashMap<>();
         response.put("totalProperties", total);
@@ -609,7 +612,7 @@ public class PropertyController {
         response.put("available for rent", available_for_rate);
         response.put("sold out", sold_out);
         response.put("rent out", rent_out);
-
+        response.put("dropped", dropped);
         return ResponseEntity.ok(response);
     }
 
@@ -814,75 +817,10 @@ public class PropertyController {
                 return "Rented Out";
             case SOLD_OUT:
                 return "Sold Out";
+            case DROPPED:
+                return "Dropped";
             default:
                 return status.toString();
-        }
-    }
-
-    @PostMapping("/{propertyId}/set-reminder")
-    public ResponseEntity<?> setReminderForRentOutProperty(
-            @PathVariable Long companyId,
-            @PathVariable Long propertyId,
-            @RequestBody Map<String, String> requestBody) {
-        
-        // Find the property and check company match
-        Optional<Property> optionalProperty = propertyRepository.findById(propertyId);
-        if (optionalProperty.isEmpty() || !optionalProperty.get().getCompany().getId().equals(companyId)) {
-            return ResponseEntity.notFound().build();
-        }
-
-        Property property = optionalProperty.get();
-        
-        // Check if property status is RENT_OUT
-        if (property.getStatus() != Property.Status.RENT_OUT) {
-            return ResponseEntity.badRequest()
-                    .body("❌ Reminder can only be set for properties with 'RENT_OUT' status. Current status: " + property.getStatus());
-        }
-
-        String reminderDateStr = requestBody.get("reminderDate");
-        System.out.println("🔍 Received reminder date: " + reminderDateStr);
-        System.out.println("🔍 Full request body: " + requestBody);
-        
-        if (reminderDateStr == null || reminderDateStr.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body("❌ Reminder date is required");
-        }
-
-        try {
-            // Parse the reminder date (handle both ISO format and local format)
-            LocalDateTime reminderDate;
-            if (reminderDateStr.contains("T") && reminderDateStr.contains("Z")) {
-                // Handle ISO format: 2025-01-15T09:00:00.000Z
-                reminderDate = LocalDateTime.parse(reminderDateStr.replace("Z", ""));
-            } else {
-                // Handle local format: 2025-01-15T09:00:00
-                reminderDate = LocalDateTime.parse(reminderDateStr);
-            }
-            System.out.println("🔍 Parsed reminder date: " + reminderDate);
-            
-            // Check if reminder date is in the future
-            if (reminderDate.isBefore(LocalDateTime.now())) {
-                return ResponseEntity.badRequest()
-                        .body("❌ Reminder date must be in the future");
-            }
-
-            // Set the reminder date
-            property.setReminderDate(reminderDate);
-            System.out.println("🔍 Set reminder date on property: " + property.getPropertyName());
-            
-            Property savedProperty = propertyRepository.save(property);
-            System.out.println("🔍 Saved property with reminder date: " + savedProperty.getReminderDate());
-
-            // No immediate notification when setting reminder
-            // Notification will be sent on the reminder date by scheduled job
-
-            return ResponseEntity.ok(Map.of(
-                "message", "✅ Reminder set successfully for property: " + property.getPropertyName(),
-                "reminderDate", reminderDate.format(DateTimeFormatter.ofPattern("dd MMM yyyy 'at' HH:mm"))
-            ));
-            
-        } catch (Exception e) {
-            return ResponseEntity.badRequest()
-                    .body("❌ Invalid date format. Please use format: yyyy-MM-dd'T'HH:mm:ss");
         }
     }
 

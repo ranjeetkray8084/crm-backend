@@ -15,6 +15,7 @@ import lombok.Setter;
 public class TaskFileDTO {
     private Long id;
     private String title;
+    private String purpose;
     private LocalDateTime uploadDate;
     private UserSummary assignedTo;
     private Long uploadedBy; // User ID who uploaded the file

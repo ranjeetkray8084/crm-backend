@@ -98,6 +98,7 @@ public class Property {
         AVAILABLE_FOR_SALE,
         AVAILABLE_FOR_RENT,
         RENT_OUT,
-        SOLD_OUT
+        SOLD_OUT,
+        DROPPED
     }
 }
