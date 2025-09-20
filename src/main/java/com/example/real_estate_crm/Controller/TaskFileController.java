@@ -57,7 +57,7 @@ public class TaskFileController {
     // 1. Upload Excel File
     @PostMapping("/upload")
     public ResponseEntity<?> uploadExcelFile(@RequestParam("title") String title,
-
+            @RequestParam("purpose") String purpose,
             @RequestParam("companyId") Long companyId,
             @RequestParam("uploadedBy") Long uploadedById,
             @RequestParam("file") MultipartFile file) throws IOException {
@@ -104,7 +104,7 @@ public class TaskFileController {
 
         TaskFile task = TaskFile.builder()
                 .title(title)
-                
+                .purpose(purpose)
                 .filePath(filePath.toString())
                 .companyId(companyId)
                 .uploadedBy(uploadedBy)
@@ -265,7 +265,7 @@ public class TaskFileController {
                 .map(task -> TaskFileDTO.builder()
                         .id(task.getId())
                         .title(task.getTitle())
-                
+                        .purpose(task.getPurpose())
                         .uploadDate(task.getUploadDate())
                         .assignedTo(
                                 task.getAssignedTo() != null ? userMap.get(task.getAssignedTo()) : null)
@@ -473,7 +473,7 @@ public class TaskFileController {
                 .map(task -> TaskFileDTO.builder()
                         .id(task.getId())
                         .title(task.getTitle())
-                     
+                        .purpose(task.getPurpose())
                         .uploadDate(task.getUploadDate())
                         .assignedTo(
                                 task.getAssignedTo() != null ? userMap.get(task.getAssignedTo()) : null)
@@ -515,7 +515,7 @@ public class TaskFileController {
                 .map(task -> TaskFileDTO.builder()
                         .id(task.getId())
                         .title(task.getTitle())
-                        
+                        .purpose(task.getPurpose())
                         .uploadDate(task.getUploadDate())
                         .assignedTo(task.getAssignedTo() != null ? userMap.get(task.getAssignedTo()) : null)
                         .uploadedBy(uploadedById)
@@ -632,7 +632,7 @@ public class TaskFileController {
                 .map(task -> TaskFileDTO.builder()
                         .id(task.getId())
                         .title(task.getTitle())
-                        
+                        .purpose(task.getPurpose())
                         .uploadDate(task.getUploadDate())
                         .assignedTo(task.getAssignedTo() != null ? userMap.get(task.getAssignedTo()) : null)
                         .uploadedBy(
