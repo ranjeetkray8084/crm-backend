@@ -120,10 +120,8 @@ public class AnnouncementController {
             // Create announcement
             Announcement announcement = new Announcement();
             
-            // Generate title from content (first 60 characters)
-            String title = request.getContent().length() > 60 ? 
-                request.getContent().substring(0, 60) + "..." : 
-                request.getContent();
+            // Use full content as title to show complete text
+            String title = request.getContent();
             announcement.setTitle(title);
             
             announcement.setMessage(request.getContent());
@@ -161,6 +159,9 @@ public class AnnouncementController {
                 Map<String, String> pushData = new HashMap<>();
                 pushData.put("type", "announcement");
                 pushData.put("announcementId", savedAnnouncement.getId().toString());
+                if (request.getImageUrl() != null && !request.getImageUrl().isBlank()) {
+                    pushData.put("imageUrl", request.getImageUrl());
+                }
                 
                 if ("ALL_COMPANIES".equals(request.getScope())) {
                     // Send to all users in all companies
@@ -173,7 +174,7 @@ public class AnnouncementController {
                         for (User user : allUsers) {
                             if (user.getStatus() != null && user.getStatus()) {
                                 notificationService.sendNotification(user.getUserId(), user.getCompany(), 
-                                    "📢 New announcement: " + title);
+                                     title);
                             }
                         }
                     } else {
@@ -183,8 +184,8 @@ public class AnnouncementController {
                         for (User user : allUsers) {
                             if (user.getRole().equals(User.Role.DIRECTOR) && user.getStatus() != null && user.getStatus()) {
                                 simplePushNotificationService.sendNotificationToUser(user.getUserId(), pushMessage, pushData);
-                                notificationService.sendNotification(user.getUserId(), user.getCompany(), 
-                                    "📢 New announcement: " + title);
+                                notificationService.sendNotification(user.getUserId(), user.getCompany(),  
+                                title);
                             }
                         }
                     }
@@ -212,7 +213,7 @@ public class AnnouncementController {
                                     // Send in-app notification
                                     if (targetCompany != null) {
                                         notificationService.sendNotification(user.getUserId(), targetCompany, 
-                                            "📢 New announcement: " + title);
+                                            title);
                                     }
                                 }
                             }
