@@ -120,12 +120,15 @@ public class AnnouncementController {
             // Create announcement
             Announcement announcement = new Announcement();
             
-            // Use full content as title to show complete text
-            String title = request.getContent();
+            // Respect DB title limit (255), keep full content in message/content
+            String fullContent = request.getContent();
+            String title = fullContent != null && fullContent.length() > 255
+                ? fullContent.substring(0, 255)
+                : fullContent;
             announcement.setTitle(title);
             
-            announcement.setMessage(request.getContent());
-            announcement.setContent(request.getContent());
+            announcement.setMessage(fullContent);
+            announcement.setContent(fullContent);
             announcement.setImageUrl(request.getImageUrl());
             announcement.setCreatedBy(currentUser);
             
@@ -155,7 +158,8 @@ public class AnnouncementController {
             
             // Send push notifications based on scope and audience
             try {
-                String pushMessage = "New Announcement: " + title;
+                // Push banner shows full text in body
+                String pushMessage = fullContent;
                 Map<String, String> pushData = new HashMap<>();
                 pushData.put("type", "announcement");
                 pushData.put("announcementId", savedAnnouncement.getId().toString());
