@@ -77,4 +77,10 @@ public interface PropertyRepository extends JpaRepository<Property, Long>, JpaSp
 
     // Count properties by company excluding DROPPED status
     long countByCompany_IdAndStatusNot(Long companyId, Property.Status status);
+
+    // Find property by external property ID
+    Property findByExternalPropertyId(String externalPropertyId);
+
+    // Find property by external property ID and company
+    Property findByExternalPropertyIdAndCompany_Id(String externalPropertyId, Long companyId);
 }

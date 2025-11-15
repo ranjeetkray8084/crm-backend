@@ -68,6 +68,9 @@ public class Property {
     @Column(name = "reminder_date")
     private LocalDateTime reminderDate;
 
+    @Column(name = "external_property_id", unique = true)
+    private String externalPropertyId;
+
     @OneToMany(mappedBy = "property", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<PropertyRemark> remarks;

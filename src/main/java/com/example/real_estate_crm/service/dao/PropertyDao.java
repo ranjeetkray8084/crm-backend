@@ -55,6 +55,12 @@ public interface PropertyDao {
     // 🔍 Filter by createdBy (creator user ID)
     List<Property> getPropertiesByCreatedBy(Long companyId, Long createdBy);
     
+    // 🔍 Find property by external property ID
+    Property findByExternalPropertyId(String externalPropertyId);
+    
+    // 🔍 Find property by external property ID and company
+    Property findByExternalPropertyIdAndCompany(String externalPropertyId, Long companyId);
+    
     List<Property> advancedSearch(PropertySearchRequest request);
     
     Page<Property> advancedSearchPaged(PropertySearchRequest request, Pageable pageable);

@@ -63,6 +63,7 @@ public class PropertyDaoImpl implements PropertyDao {
         existing.setSector(incoming.getSector());
         existing.setStatus(incoming.getStatus());
         existing.setRemarks(incoming.getRemarks());
+        existing.setExternalPropertyId(incoming.getExternalPropertyId());
 
         return propertyRepository.save(existing);
     }
@@ -137,6 +138,16 @@ public class PropertyDaoImpl implements PropertyDao {
     @Override
     public List<Property> getPropertiesByCreatedBy(Long companyId, Long createdByUserId) {
         return propertyRepository.findByCompany_IdAndCreatedBy_UserId(companyId, createdByUserId);
+    }
+
+    @Override
+    public Property findByExternalPropertyId(String externalPropertyId) {
+        return propertyRepository.findByExternalPropertyId(externalPropertyId);
+    }
+
+    @Override
+    public Property findByExternalPropertyIdAndCompany(String externalPropertyId, Long companyId) {
+        return propertyRepository.findByExternalPropertyIdAndCompany_Id(externalPropertyId, companyId);
     }
 
 

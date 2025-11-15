@@ -44,7 +44,8 @@ public class SecurityConfig {
                                 "/favicon.ico",
                                 "/version.json",
                                 "/api/auth/**",
-                                "/api/contact" // ✅ Allow unauthenticated access to contact API
+                                "/api/contact", // ✅ Allow unauthenticated access to contact API
+                                "/api/webhook/**" // ✅ Allow unauthenticated access to webhook endpoints
                         ).permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex

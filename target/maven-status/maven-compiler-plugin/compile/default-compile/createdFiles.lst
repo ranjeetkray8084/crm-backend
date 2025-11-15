@@ -57,6 +57,7 @@ com\example\real_estate_crm\service\dao\NotificationDao.class
 com\example\real_estate_crm\repository\LeadRemarkRepository.class
 com\example\real_estate_crm\service\impl\LeadDaoImpl.class
 com\example\real_estate_crm\model\TaskFile.class
+com\example\real_estate_crm\Controller\WebhookController.class
 com\example\real_estate_crm\model\Lead$Source.class
 com\example\real_estate_crm\model\UserAvatar.class
 com\example\real_estate_crm\service\dao\CompanyDao.class

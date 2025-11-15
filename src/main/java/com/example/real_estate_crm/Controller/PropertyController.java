@@ -303,6 +303,53 @@ public class PropertyController {
         return ResponseEntity.ok(updated);
     }
 
+    @PutMapping("/{propertyId}/property-code")
+    public ResponseEntity<?> updatePropertyCode(@PathVariable Long companyId, @PathVariable Long propertyId, 
+                                               @RequestBody Map<String, String> request) {
+        try {
+            System.out.println("🔗 Backend API: PUT /api/companies/" + companyId + "/properties/" + propertyId + "/property-code");
+            System.out.println("📤 Request Body: " + request);
+            
+            Property existingProperty = propertyService.findById(propertyId, companyId);
+            if (existingProperty == null) {
+                System.out.println("❌ Property not found for ID: " + propertyId + " in company: " + companyId);
+                return ResponseEntity.notFound().build();
+            }
+
+            String externalPropertyId = request.get("externalPropertyId");
+            System.out.println("📝 External Property ID: " + externalPropertyId);
+            
+            if (externalPropertyId != null) {
+                existingProperty.setExternalPropertyId(externalPropertyId);
+                Property updatedProperty = propertyService.updateProperty(existingProperty);
+                
+                System.out.println("✅ Property code updated successfully for property: " + updatedProperty.getPropertyName());
+                
+                Map<String, Object> response = Map.of(
+                    "success", true,
+                    "message", "Property code updated successfully",
+                    "property", updatedProperty
+                );
+                
+                System.out.println("📥 Response: " + response);
+                return ResponseEntity.ok(response);
+            } else {
+                System.out.println("❌ External Property ID is null");
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Property code is required"
+                ));
+            }
+        } catch (Exception e) {
+            System.out.println("❌ Error updating property code: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Failed to update property code: " + e.getMessage()
+            ));
+        }
+    }
+
     @GetMapping("/paged")
     public ResponseEntity<Page<PropertyDTO>> getAllPropertiesPaged(
             @PathVariable Long companyId,
